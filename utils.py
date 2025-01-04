@@ -5,6 +5,7 @@ from pylab import *
 import tensorflow as tf
 import cv2
 from PIL import ImageFilter
+import scipy.io as sio
 
 tf.compat.v1.disable_eager_execution()
 tf = tf.compat.v1  # Alias tf.compat.v1 as tf
@@ -38,23 +39,36 @@ def data_augmentation(image, mode):
         image = np.rot90(image, k=3)
         return np.flipud(image)
 
-def load_images(file):
+def load_images(file, img_type='rgb', matContentHeader='data', normalize='self', globalMax=None):
+    if img_type == 'rgb':
+        return load_rgb(file)
+    elif img_type == 'hsi':
+        return load_hsi(file, matContentHeader, normalize, globalMax)
+
+def load_rgb(file):
     im = Image.open(file)
     h= im.size[0]-im.size[0]%4
     w= im.size[1]-im.size[1]%4
     x=(np.array(im,dtype="float32") / 255.0)
     return x
-    # return (np.array(im,dtype="float32") / 255.0)[0:w,0:h,:]
-def white_world(image):
-    mean_RGB = np.mean(np.mean(image,axis=0),axis=0)
 
-    ratio = np.clip(mean_RGB/mean_RGB.min(),1.0,1.1)
-    white_image = image
-    white_image[:,:,0] =  white_image[:,:,0] / ratio[0]
-    white_image[:,:,1] =  white_image[:,:,1] / ratio[1]
-    white_image[:,:,2] =  white_image[:,:,2] / ratio[2]
+def load_hsi(file, matContentHeader='data', normalize='self', globalMax=None):
+    mat = sio.loadmat(file)
+    mat = mat[matContentHeader]
+    mat = mat.astype('float32')
 
-    return white_image
+    x = np.array(mat, dtype='float32')
+
+    if normalize is not None:
+        if normalize == 'self':
+            x = x / np.amax(mat)
+        elif normalize == 'global':
+            if globalMax == None:
+                raise("Error: max value is not provided for normalization.")
+            else:
+                x = x / globalMax
+
+    return x
 
 def save_images(filepath, result_1, result_2 = None):
     result_1 = np.squeeze(result_1)

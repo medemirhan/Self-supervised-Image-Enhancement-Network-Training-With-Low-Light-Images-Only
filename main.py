@@ -68,10 +68,10 @@ def lowlight_train(lowlight_enhance, args):
     print('[*] Number of training data: %d' % len(train_low_data_names))
 
     for idx in range(len(train_low_data_names)):
-        low_im = load_images(train_low_data_names[idx])
+        low_im = load_images(train_low_data_names[idx], img_type='hsi')
         #low_im = white_world(low_im)
         train_low_data.append(low_im)
-        high_im = load_images(train_high_data_names[idx])
+        high_im = load_images(train_high_data_names[idx], img_type='hsi')
         # high_im = white_world(high_im)
         train_high_data.append(high_im)
         # train_low_data_max_chan = np.max(meanFilter(low_im,winSize=(5,5)),axis=2,keepdims=True)
@@ -91,7 +91,7 @@ def lowlight_train(lowlight_enhance, args):
     eval_low_data_name = glob(args.eval_low_dir + '/*.*')
 
     for idx in range(len(eval_low_data_name)):
-        eval_low_im = load_images(eval_low_data_name[idx])
+        eval_low_im = load_images(eval_low_data_name[idx], img_type='hsi')
         eval_low_data.append(eval_low_im)
 
     lowlight_enhance.train(
@@ -125,7 +125,7 @@ def lowlight_test(lowlight_enhance, args):
     test_high_data = []
     print(test_low_data_name)
     for idx in range(len(test_low_data_name)):
-        test_low_im = load_images(test_low_data_name[idx])
+        test_low_im = load_images(test_low_data_name[idx], img_type='hsi')
         test_low_data.append(test_low_im)
 
     lowlight_enhance.test(
