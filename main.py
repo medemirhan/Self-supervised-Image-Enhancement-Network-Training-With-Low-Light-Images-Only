@@ -94,7 +94,20 @@ def lowlight_train(lowlight_enhance, args):
         eval_low_im = load_images(eval_low_data_name[idx])
         eval_low_data.append(eval_low_im)
 
-    lowlight_enhance.train(train_low_data,train_low_data_eq, eval_low_data,train_high_data, batch_size=args.batch_size, patch_size=args.patch_size, epoch=args.epoch, lr=lr, sample_dir=args.sample_dir, ckpt_dir=os.path.join(args.ckpt_dir, 'Decom'), eval_every_epoch=args.eval_every_epoch, train_phase="Decom")
+    lowlight_enhance.train(
+        train_low_data,
+        train_low_data_eq, 
+        eval_low_data,
+        train_high_data, 
+        batch_size=args.batch_size, 
+        patch_size=args.patch_size, 
+        epoch=args.epoch, 
+        lr=lr, 
+        sample_dir=args.sample_dir, 
+        ckpt_dir=os.path.join(args.ckpt_dir, 'Decom'), 
+        eval_every_epoch=args.eval_every_epoch, 
+        train_phase="Decom"
+        )
 
     # lowlight_enhance.train(train_low_data, train_high_data, eval_low_data, batch_size=args.batch_size, patch_size=args.patch_size, epoch=args.epoch, lr=lr, sample_dir=args.sample_dir, ckpt_dir=os.path.join(args.ckpt_dir, 'Relight'), eval_every_epoch=args.eval_every_epoch, train_phase="Relight")
 
@@ -115,7 +128,13 @@ def lowlight_test(lowlight_enhance, args):
         test_low_im = load_images(test_low_data_name[idx])
         test_low_data.append(test_low_im)
 
-    lowlight_enhance.test(test_low_data, test_high_data, test_low_data_name, save_dir=args.save_dir, decom_flag=args.decom)
+    lowlight_enhance.test(
+        test_low_data, 
+        test_high_data, 
+        test_low_data_name, 
+        save_dir=args.save_dir, 
+        decom_flag=args.decom
+        )
 
 def main(args):
     if args.use_gpu:
