@@ -68,18 +68,6 @@ def save_images(filepath, result_1, result_2 = None):
     im = Image.fromarray(np.clip(cat_image * 255.0, 0, 255.0).astype('uint8'))
     im.save(filepath, 'png')
 
-def save_images2(filepath, result_1, result_2 = None):
-    result_1 = np.squeeze(result_1)
-    result_2 = np.squeeze(result_2)
-
-    if not result_2.any():
-        cat_image = result_1
-    else:
-        cat_image = np.concatenate([result_1, result_2], axis = 1)
-
-    im = Image.fromarray(np.clip(np.abs(cat_image * 255.0), 0, 255.0).astype('uint8'))
-    im.save(filepath, 'png')
-
 def histeq(im,nbr_bins = 256):
     """对一幅灰度图像进行直方图均衡化"""
     #计算图像的直方图
@@ -90,6 +78,7 @@ def histeq(im,nbr_bins = 256):
     #使用累积分布函数的线性插值，计算新的像素值
     im2 = interp(im.flatten(),bins[:-1],cdf)
     return im2.reshape(im.shape)
+
 def adapthisteq(im,NumTiles=8,ClipLimit=0.01,NBins=256):
 # other methods can be tried too！not only histeq ，like LAHE or others in the max channel
     mri_img = im * 255.0;
@@ -106,34 +95,3 @@ def adapthisteq(im,NumTiles=8,ClipLimit=0.01,NBins=256):
             clahe = cv2.createCLAHE(clipLimit=40.0, tileGridSize=(8,8))
             mri_img[:,:,k] = clahe.apply(temp)
     return  (np.array(mri_img, dtype="float32") / 255.0).reshape(im.shape)
-
-def meanFilter(I,winSize=(20,20)):
-    mean_I = cv2.medianBlur(I, 3)      # I的均值平滑
-    return mean_I
-
-def guideFilter(I, p, winSize, eps):
-
-    #mean_I = I.filter(ImageFilter.BLUR,(3,3))
-
-    mean_I = cv2.blur(I, winSize)      # I的均值平滑
-    mean_p = cv2.blur(p, winSize)      # p的均值平滑
-
-    mean_II = cv2.blur(I * I, winSize) # I*I的均值平滑
-    mean_Ip = cv2.blur(I * p, winSize) # I*p的均值平滑
-
-    var_I = mean_II - mean_I * mean_I  # 方差
-    
-    cov_Ip = mean_Ip - mean_I * mean_p # 协方差
-
-    a = cov_Ip / (var_I + eps)         # 相关因子a
-    b = mean_p - a * mean_I            # 相关因子b
-
-    mean_a = cv2.blur(a, winSize)      # 对a进行均值平滑
-    mean_b = cv2.blur(b, winSize)      # 对b进行均值平滑
-
-    weight = mean_a
-
-    q = mean_a * np.squeeze(I) + mean_b
-    return weight[:,:,np.newaxis] , q[:,:,np.newaxis]
-def sigmoid(x):
-    return 1/(1+np.exp(-x))
