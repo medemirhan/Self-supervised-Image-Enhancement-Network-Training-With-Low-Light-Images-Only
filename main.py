@@ -150,7 +150,7 @@ if __name__ == '__main__':
     args.gpu_idx = '0'
     args.gpu_mem = float(0.8)
     args.decom = 1
-    args.sample_dir = './sample'
+    args.sample_dir = './data/eval_results'
 
     args.phase = 'train'
     args.epoch = 600
