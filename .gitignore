@@ -7,12 +7,12 @@ __pycache__/
 .vscode/
 
 checkpoint/*
-sample/*
 data/*
 data/test/*
 data/test_results/*
+data/eval_results/*
 !checkpoint/.gitkeep
-!sample/.gitkeep
 !data/.gitkeep
 !data/test/.gitkeep
 !data/test_results/.gitkeep
+!data/eval_results/.gitkeep
