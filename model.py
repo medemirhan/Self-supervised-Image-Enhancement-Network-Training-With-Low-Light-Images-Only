@@ -11,6 +11,10 @@ import numpy as np
 import numpy.random as random
 from utils import *
 from scipy.ndimage import maximum_filter
+
+tf.compat.v1.disable_eager_execution()
+tf = tf.compat.v1  # Alias tf.compat.v1 as tf
+
 def concat(layers):
     return tf.concat(layers, axis=3)
 

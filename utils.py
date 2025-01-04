@@ -6,6 +6,9 @@ import tensorflow as tf
 import cv2
 from PIL import ImageFilter
 
+tf.compat.v1.disable_eager_execution()
+tf = tf.compat.v1  # Alias tf.compat.v1 as tf
+
 def data_augmentation(image, mode):
     if mode == 0:
         # original
