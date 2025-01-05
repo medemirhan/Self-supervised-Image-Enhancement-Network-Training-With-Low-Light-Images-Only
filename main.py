@@ -126,7 +126,11 @@ def main(args):
             if args.channels is None:
                 first_image = load_images(glob(args.train_low_dir + '/*.*')[0])
                 args.channels = first_image.shape[-1]
-            model = lowlight_enhance(sess, input_channels=args.channels)
+            model = lowlight_enhance(
+                sess,
+                input_channels=args.channels,
+                spectral_kernel_size=args.spectral_kernel_size
+                )
             if args.phase == 'train':
                 lowlight_train(model, args)
             elif args.phase == 'test':
@@ -137,7 +141,15 @@ def main(args):
     else:
         print("[*] CPU\n")
         with tf.Session() as sess:
-            model = lowlight_enhance(sess)
+            # Get number of channels from first image if not specified
+            if args.channels is None:
+                first_image = load_images(glob(args.train_low_dir + '/*.*')[0])
+                args.channels = first_image.shape[-1]
+            model = lowlight_enhance(
+                sess,
+                input_channels=args.channels,
+                spectral_kernel_size=args.spectral_kernel_size
+                )
             if args.phase == 'train':
                 lowlight_train(model, args)
             elif args.phase == 'test':
@@ -156,12 +168,13 @@ if __name__ == '__main__':
     args.sample_dir = './data/eval_results'
 
     args.phase = 'train'
-    args.epoch = 1000
+    args.epoch = 600
     args.batch_size = 1
     args.patch_size = 48
     args.start_lr = 1e-3
     args.eval_every_epoch = 100
     args.plot_every_epoch = 5
+    args.spectral_kernel_size = 3
 
     args.ckpt_dir = './checkpoint'
     args.save_dir = './data/test_results'

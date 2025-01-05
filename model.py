@@ -7,55 +7,153 @@ import tensorflow as tf
 import numpy as np
 from utils import *
 from scipy.ndimage import maximum_filter
+import matplotlib.pyplot as plt
 
 tf.compat.v1.disable_eager_execution()
 tf = tf.compat.v1  # Alias tf.compat.v1 as tf
 
 def concat(layers):
-    return tf.concat(layers, axis=3)
+    return tf.concat(layers, axis=4)  # Changed to axis 4 for 3D convolutions
 
-def DecomNet(input_im, layer_num, channel=64, kernel_size=3, is_training=True):
+def DecomNet3D(input_im, layer_num, channel=64, kernel_size=3, spectral_kernel_size=3, is_training=True):
+    """
+    Modified DecomNet to use 3D convolutions for spectral-spatial processing
+    Args:
+        input_im: Input tensor of shape [batch, height, width, channels]
+        spectral_kernel_size: Size of kernel in spectral dimension
+    """
     # Get static number of input channels
     input_shape = input_im.get_shape().as_list()
     input_channels = input_shape[-1]
     
-    # Calculate channel-wise maximum
+    # Calculate channel-wise maximum and reshape it to match input channels
     input_max = tf.reduce_max(input_im, axis=3, keepdims=True)
-    input_concat = concat([input_max, input_im])
+    input_max_expanded = tf.tile(input_max, [1, 1, 1, input_channels])  # Expand to match channels
     
-    # Get the concatenated channel dimension (static)
-    concat_channels = input_channels + 1  # original channels + max channel
+    # Reshape both tensors to 5D for 3D convolutions [batch, height, width, spectral_depth, 1]
+    input_5d = tf.expand_dims(input_im, axis=4)
+    input_max_5d = tf.expand_dims(input_max_expanded, axis=4)
+    input_concat = concat([input_max_5d, input_5d])
     
     with tf.variable_scope('DecomNet', reuse=tf.AUTO_REUSE):
-        # First layer with fixed number of output channels
-        conv_0 = tf.layers.conv2d(input_concat, channel//2, kernel_size, padding='same', activation=tf.nn.relu, name="first_layer")
-        conv = tf.layers.conv2d(input_concat, channel, kernel_size * 3, padding='same', activation=None, name="shallow_feature_extraction")
-        
-        conv1 = tf.layers.conv2d(conv, channel, kernel_size, padding='same', activation=tf.nn.relu, name='activated_layer_1')
-        conv2 = tf.layers.conv2d(conv1, channel*2, kernel_size, strides=2, padding='same', activation=tf.nn.relu, name='activated_layer_2')
-        conv3 = tf.layers.conv2d(conv2, channel*2, kernel_size, padding='same', activation=tf.nn.relu, name='activated_layer_3')
-        conv4 = tf.layers.conv2d_transpose(conv3, channel, kernel_size, strides=2, padding='same', activation=tf.nn.relu, name='activated_layer_4')
-        
+        # First 3D convolution layer
+        conv_0 = tf.layers.conv3d(
+            input_concat, 
+            channel//2,
+            kernel_size=(kernel_size, kernel_size, spectral_kernel_size),
+            padding='same',
+            activation=tf.nn.relu,
+            name="first_layer"
+        )
+
+        # Shallow feature extraction with 3D conv
+        conv = tf.layers.conv3d(
+            input_concat,
+            channel,
+            kernel_size=(kernel_size * 3, kernel_size * 3, spectral_kernel_size),
+            padding='same',
+            activation=None,
+            name="shallow_feature_extraction"
+        )
+
+        # Deeper layers with 3D convolutions
+        conv1 = tf.layers.conv3d(
+            conv,
+            channel,
+            kernel_size=(kernel_size, kernel_size, spectral_kernel_size),
+            padding='same',
+            activation=tf.nn.relu,
+            name='activated_layer_1'
+        )
+
+        conv2 = tf.layers.conv3d(
+            conv1,
+            channel*2,
+            kernel_size=(kernel_size, kernel_size, spectral_kernel_size),
+            strides=(2, 2, 1),  # Don't downsample in spectral dimension
+            padding='same',
+            activation=tf.nn.relu,
+            name='activated_layer_2'
+        )
+
+        conv3 = tf.layers.conv3d(
+            conv2,
+            channel*2,
+            kernel_size=(kernel_size, kernel_size, spectral_kernel_size),
+            padding='same',
+            activation=tf.nn.relu,
+            name='activated_layer_3'
+        )
+
+        # Transpose conv for upsampling
+        conv4 = tf.layers.conv3d_transpose(
+            conv3,
+            channel,
+            kernel_size=(kernel_size, kernel_size, spectral_kernel_size),
+            strides=(2, 2, 1),  # Don't upsample in spectral dimension
+            padding='same',
+            activation=tf.nn.relu,
+            name='activated_layer_4'
+        )
+
+        # Skip connections
         conv4_ba2 = concat([conv4, conv1])
-        conv5 = tf.layers.conv2d(conv4_ba2, channel, kernel_size, padding='same', activation=tf.nn.relu, name='activated_layer_5')
+        conv5 = tf.layers.conv3d(
+            conv4_ba2,
+            channel,
+            kernel_size=(kernel_size, kernel_size, spectral_kernel_size),
+            padding='same',
+            activation=tf.nn.relu,
+            name='activated_layer_5'
+        )
+
         conv6 = concat([conv5, conv_0])
-        conv7 = tf.layers.conv2d(conv6, channel, kernel_size, padding='same', activation=None, name='activated_layer_7')
-        
-        # Get static number of output channels
-        output_channels = input_im.get_shape().as_list()[-1]
-        conv8 = tf.layers.conv2d(conv7, output_channels + 1, kernel_size, padding='same', activation=None, name='recon_layer')
+        conv7 = tf.layers.conv3d(
+            conv6,
+            channel,
+            kernel_size=(kernel_size, kernel_size, spectral_kernel_size),
+            padding='same',
+            activation=None,
+            name='activated_layer_7'
+        )
 
-    # R maintains input channel dimension, L is single channel
-    R = tf.sigmoid(conv8[:,:,:,:output_channels])
-    L = tf.sigmoid(conv8[:,:,:,output_channels:])  # Illumination map is still single channel
+        # Final layer to output R and L
+        '''conv8 = tf.layers.conv3d(
+            conv7,
+            1,  # We want only one feature map
+            kernel_size=(kernel_size, kernel_size, spectral_kernel_size),
+            padding='same',
+            activation=None,
+            name='recon_layer'
+        )'''
+        conv8 = tf.layers.conv3d(
+            conv7,
+            input_channels + 1,  # Output input_channels + 1 feature maps
+            kernel_size=(kernel_size, kernel_size, spectral_kernel_size),
+            padding='same',
+            activation=None,
+            name='recon_layer'
+        )
 
-    return R, L
+        # Get dynamic shape using tf.shape instead of get_shape()
+        shape = tf.shape(conv8)
+        #conv8_reshaped = tf.reshape(conv8, [shape[0], shape[1], shape[2], input_channels + 1])
+        conv8_reshaped = tf.reshape(conv8, [-1, shape[1], shape[2], input_channels + 1])
+
+        # Split channels for R and L
+        '''R = tf.sigmoid(conv8_reshaped[:,:,:,:input_channels])
+        L = tf.sigmoid(conv8_reshaped[:,:,:,input_channels:])  # Illumination map'''
+        R = tf.sigmoid(conv8_reshaped[:, :, :, :input_channels])
+        L = tf.sigmoid(conv8_reshaped[:, :, :, input_channels:])
+
+        return R, L
 
 class lowlight_enhance(object):
-    def __init__(self, sess, input_channels=3):
+    def __init__(self, sess, input_channels=3, spectral_kernel_size=3):
         self.sess = sess
         self.DecomNet_layer_num = 5
-        self.input_channels = input_channels  # Store channel count
+        self.input_channels = input_channels
+        self.spectral_kernel_size = spectral_kernel_size
         
         # Store average losses per epoch
         self.epoch_losses = {
@@ -65,6 +163,7 @@ class lowlight_enhance(object):
             'R_smooth_loss': [],
             'I_smooth_loss': []
         }
+        
         # For accumulating losses within each epoch
         self.current_epoch_losses = {
             'total_loss': 0,
@@ -75,12 +174,17 @@ class lowlight_enhance(object):
             'steps': 0
         }
 
-        # Modified placeholders with specific channel dimension
+        # Placeholders
         self.input_low = tf.placeholder(tf.float32, [None, None, None, self.input_channels], name='input_low')
         self.input_high = tf.placeholder(tf.float32, [None, None, None, self.input_channels], name='input_high')
         self.input_low_eq = tf.placeholder(tf.float32, [None, None, None, 1], name='input_low_eq')
 
-        [R_low, I_low] = DecomNet(self.input_low, layer_num=self.DecomNet_layer_num)
+        # Use 3D DecomNet
+        [R_low, I_low] = DecomNet3D(
+            self.input_low, 
+            layer_num=self.DecomNet_layer_num,
+            spectral_kernel_size=self.spectral_kernel_size
+        )
 
         # Repeat illumination map for all channels
         I_low_expanded = tf.tile(I_low, [1, 1, 1, self.input_channels])
@@ -89,25 +193,27 @@ class lowlight_enhance(object):
         self.output_I_low = I_low_expanded
         self.output_S_low_zy = (R_low * I_low_expanded)
 
-        # Loss calculations
+        # Loss calculations with spectral considerations
         self.recon_loss_low = tf.reduce_mean(tf.abs(R_low * I_low_expanded - self.input_high))
         
-        # Modified to handle multiple channels
+        # Modified to handle spectral dimension
         R_low_max = tf.reduce_max(R_low, axis=3, keepdims=True)
         self.recon_loss_low_eq = tf.reduce_mean(tf.abs(R_low_max - self.input_low_eq))
         
-        # Calculate smoothness loss using average across channels
+        # Smoothness loss across spatial and spectral dimensions
         R_low_gray = tf.reduce_mean(R_low, axis=3, keepdims=True)
         self.R_low_loss_smooth = tf.reduce_mean(tf.abs(self.gradient(R_low_gray, "x")) + 
                                               tf.abs(self.gradient(R_low_gray, "y")))
         
         self.Ismooth_loss_low = self.smooth(I_low, R_low_gray)
 
+        # Combined loss
         self.loss_Decom_zhangyu = (self.recon_loss_low + 
                                   0.1 * self.Ismooth_loss_low + 
                                   0.1 * self.recon_loss_low_eq + 
                                   0.01 * self.R_low_loss_smooth)
 
+        # Optimizer setup
         self.lr = tf.placeholder(tf.float32, name='learning_rate')
         optimizer = tf.train.AdamOptimizer(self.lr, name='AdamOptimizer')
 
@@ -119,21 +225,41 @@ class lowlight_enhance(object):
         print("[*] Initialize model successfully...")
 
     def gradient(self, input_tensor, direction):
-        self.smooth_kernel_x = tf.reshape(tf.constant([[0, 0], [-1, 1]], tf.float32), [2, 2, 1, 1])
-        self.smooth_kernel_y = tf.transpose(self.smooth_kernel_x, [1, 0, 2, 3])
+        """Modified gradient calculation for spectral-spatial processing"""
+        input_shape = tf.shape(input_tensor)
+        
+        # Expand the kernels for 3D convolution
+        self.smooth_kernel_x = tf.reshape(tf.constant([[0, 0], [-1, 1]], tf.float32), [2, 2, 1, 1, 1])
+        self.smooth_kernel_y = tf.transpose(self.smooth_kernel_x, [1, 0, 2, 3, 4])
+
+        # Add an extra dimension to input tensor if needed
+        if len(input_tensor.get_shape()) == 4:
+            input_tensor = tf.expand_dims(input_tensor, axis=-1)
 
         if direction == "x":
             kernel = self.smooth_kernel_x
         elif direction == "y":
             kernel = self.smooth_kernel_y
-        return tf.abs(tf.nn.conv2d(input_tensor, kernel, strides=[1, 1, 1, 1], padding='SAME'))
+        
+        return tf.abs(tf.nn.conv3d(input_tensor, kernel, strides=[1, 1, 1, 1, 1], padding='SAME'))
 
     def ave_gradient(self, input_tensor, direction):
-        return tf.layers.average_pooling2d(self.gradient(input_tensor, direction), pool_size=3, strides=1, padding='SAME')
+        """Modified average gradient for 3D data"""
+        grad = self.gradient(input_tensor, direction)
+        return tf.layers.average_pooling3d(grad, pool_size=[3, 3, 1], strides=[1, 1, 1], padding='SAME')
 
     def smooth(self, input_I, input_R):
-        return tf.reduce_mean(self.gradient(input_I, "x") * tf.exp(-10 * self.gradient(input_R, "x")) + 
-                            self.gradient(input_I, "y") * tf.exp(-10 * self.gradient(input_R, "y")))
+        """Modified smoothness calculation for 3D data"""
+        # Ensure 5D tensors
+        if len(input_I.get_shape()) == 4:
+            input_I = tf.expand_dims(input_I, axis=-1)
+        if len(input_R.get_shape()) == 4:
+            input_R = tf.expand_dims(input_R, axis=-1)
+
+        return tf.reduce_mean(
+            self.gradient(input_I, "x") * tf.exp(-10 * self.gradient(input_R, "x")) +
+            self.gradient(input_I, "y") * tf.exp(-10 * self.gradient(input_R, "y"))
+        )
 
     def evaluate(self, epoch_num, eval_low_data, sample_dir, train_phase):
         print("[*] Evaluating for phase %s / epoch %d..." % (train_phase, epoch_num))
@@ -150,7 +276,6 @@ class lowlight_enhance(object):
 
     def plot_loss_curve(self, save_path='loss_curve.png'):
         """Plot and save all training loss curves with epoch numbers"""
-        import matplotlib.pyplot as plt
         
         epochs = range(1, len(self.epoch_losses['total_loss']) + 1)
         
@@ -207,11 +332,9 @@ class lowlight_enhance(object):
         print(f"Loss curves saved to {save_path}")
 
     def train(self, train_low_data, train_low_data_eq, eval_low_data, train_high_data, batch_size, patch_size, epoch, lr, sample_dir, ckpt_dir, eval_every_epoch, train_phase, plot_every_epoch=10):
-        """
-        Added plot_every_epoch parameter to control how often we plot losses
-        """
+        """Train the model with 3D convolution support"""
         # Get channel dimension from input data
-        h, w, channels = train_low_data[0].shape  # 3D array: height, width, channels
+        h, w, channels = train_low_data[0].shape
         numBatch = len(train_low_data) // int(batch_size)
 
         # load pretrained model
@@ -359,8 +482,8 @@ class lowlight_enhance(object):
             print("[*] Failed to load model from %s" % ckpt_dir)
             return False, 0
 
-    def test(self, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag):
-        tf.global_variables_initializer().run()
+    def test(self, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag, batch_size=1):
+        '''tf.global_variables_initializer().run()
 
         print("[*] Reading checkpoint...")
         load_model_status_Decom, _ = self.load(self.saver_Decom, './checkpoint/Decom')
@@ -391,4 +514,41 @@ class lowlight_enhance(object):
                 save_images(os.path.join(save_dir, name + "_I_low." + suffix), I_low)
 
         ave_run_time = total_run_time / (float(len(test_low_data))-1)
+        print("[*] Average run time: %.4f" % ave_run_time)'''
+
+        tf.global_variables_initializer().run()
+
+        print("[*] Reading checkpoint...")
+        load_model_status_Decom, _ = self.load(self.saver_Decom, './checkpoint/Decom')
+        if load_model_status_Decom:
+            print("[*] Load weights successfully...")
+        
+        print("[*] Testing...")
+        total_run_time = 0.0
+        
+        for idx in range(0, len(test_low_data), batch_size):
+            batch_low_data = test_low_data[idx:idx + batch_size]
+            batch_low_data = np.stack(batch_low_data, axis=0)
+
+            start_time = time.time()
+            R_low, I_low, output_S_low_zy = self.sess.run(
+                [self.output_R_low, self.output_I_low, self.output_S_low_zy], 
+                feed_dict={self.input_low: batch_low_data}
+            )
+            
+            if idx != 0:
+                total_run_time += time.time() - start_time
+            
+            for i in range(len(batch_low_data)):
+                idx_img = idx + i
+                print(test_low_data_names[idx_img])
+                [_, name] = os.path.split(test_low_data_names[idx_img])
+                suffix = name[name.find('.') + 1:]
+                name = name[:name.find('.')]
+
+                if decom_flag == decom_flag:
+                    save_images(os.path.join(save_dir, name + "_R_low." + suffix), R_low[i])
+                    save_images(os.path.join(save_dir, name + "_I_low." + suffix), I_low[i])
+
+        ave_run_time = total_run_time / (float(len(test_low_data)) - 1)
         print("[*] Average run time: %.4f" % ave_run_time)
