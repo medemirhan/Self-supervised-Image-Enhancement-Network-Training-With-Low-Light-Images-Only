@@ -153,7 +153,7 @@ if __name__ == '__main__':
     args.gpu_idx = '0'
     args.gpu_mem = float(0.8)
     args.decom = 1
-    args.sample_dir = './data/eval_results_hsi'
+    args.sample_dir = './data/eval_results'
 
     args.phase = 'train'
     args.epoch = 1000
@@ -163,8 +163,8 @@ if __name__ == '__main__':
     args.eval_every_epoch = 100
     args.plot_every_epoch = 5
 
-    args.ckpt_dir = './checkpoint_hsi'
-    args.save_dir = './data/test_results_hsi'
+    args.ckpt_dir = './checkpoint'
+    args.save_dir = './data/test_results'
     args.test_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/test'
     args.channels = 31
 
