@@ -4,20 +4,15 @@ import os
 import argparse
 from glob import glob
 
-from PIL import Image
 import tensorflow as tf
-
 from model import lowlight_enhance
 from utils import *
 
 tf.compat.v1.disable_eager_execution()
 tf = tf.compat.v1  # Alias tf.compat.v1 as tf
 
-class Struct():
-    pass
-
 def parse_args():
-    parser = argparse.ArgumentParser(description='')
+    parser = argparse.ArgumentParser(description='Hyperspectral Image Enhancement')
 
     parser.add_argument('--use_gpu', dest='use_gpu', type=int, default=1, help='gpu flag, 1 for GPU and 0 for CPU')
     parser.add_argument('--gpu_idx', dest='gpu_idx', default="0", help='GPU idx')
@@ -28,13 +23,16 @@ def parse_args():
     parser.add_argument('--batch_size', dest='batch_size', type=int, default=16, help='number of samples in one batch')
     parser.add_argument('--patch_size', dest='patch_size', type=int, default=48, help='patch size')
     parser.add_argument('--start_lr', dest='start_lr', type=float, default=0.001, help='initial learning rate for adam')
-    parser.add_argument('--eval_every_epoch', dest='eval_every_epoch', default=100, help='evaluating and saving checkpoints every #  epoch')
+    parser.add_argument('--eval_every_epoch', dest='eval_every_epoch', default=100, help='evaluating and saving checkpoints every # epoch')
     parser.add_argument('--checkpoint_dir', dest='ckpt_dir', default='./checkpoint', help='directory for checkpoints')
     parser.add_argument('--sample_dir', dest='sample_dir', default='./sample', help='directory for evaluating outputs')
 
     parser.add_argument('--save_dir', dest='save_dir', default='./test_results', help='directory for testing outputs')
     parser.add_argument('--test_dir', dest='test_dir', default='./data/test', help='directory for testing inputs')
     parser.add_argument('--decom', dest='decom', default=1, help='decom flag, 0 for enhanced results only and 1 for decomposition results')
+    
+    # Add new argument for number of spectral channels
+    parser.add_argument('--channels', dest='channels', type=int, default=None, help='number of spectral channels')
 
     return parser.parse_args()
 
@@ -50,48 +48,31 @@ def lowlight_train(lowlight_enhance, args):
     train_low_data = []
     train_high_data = []
     train_low_data_eq = []
-    train_low_data_clahe = []
-    train_high_data_eq = []
 
-    train_low_data_eq_guide = []
-    train_high_data_eq_guide = []
-    train_low_data_eq_guide_weight = []
-    train_low_data_eq_clahe_weight = []
-    train_high_data_eq_guide_weight = []
-
-
-    train_low_data_names = glob(args.train_low_dir + '/*.png') 
+    # Load training data
+    train_low_data_names = glob(args.train_low_dir + '/*.*')  # Modified to accept any extension
     train_low_data_names.sort()
-    train_high_data_names = glob(args.train_low_dir + '/*.png') 
+    train_high_data_names = glob(args.train_low_dir + '/*.*')  # Modified to accept any extension
     train_high_data_names.sort()
     assert len(train_low_data_names) == len(train_high_data_names)
     print('[*] Number of training data: %d' % len(train_low_data_names))
 
     for idx in range(len(train_low_data_names)):
-        low_im = load_images(train_low_data_names[idx], img_type='hsi')
-        #low_im = white_world(low_im)
+        low_im = load_images(train_low_data_names[idx])
         train_low_data.append(low_im)
-        high_im = load_images(train_high_data_names[idx], img_type='hsi')
-        # high_im = white_world(high_im)
+        high_im = load_images(train_high_data_names[idx])
         train_high_data.append(high_im)
-        # train_low_data_max_chan = np.max(meanFilter(low_im,winSize=(5,5)),axis=2,keepdims=True)
-        train_low_data_max_chan = np.max(high_im,axis=2,keepdims=True)
-
-        weight_eq_clahe=0#sigmoid(5*(meanFilter(train_low_data_max_chan,(20,20))-0.5))
-        train_low_data_max_channel = (1-weight_eq_clahe) * histeq(train_low_data_max_chan) + weight_eq_clahe * adapthisteq(train_low_data_max_chan)
-        # train_low_data_max_channel = histeq(low_im[:,:,1])
-
-        train_low_data_eq.append(train_low_data_max_channel[:,:,:])
-
-
+        
+        # Calculate max channel for equalization (across all spectral bands)
+        train_low_data_max_chan = np.max(high_im, axis=2, keepdims=True)
+        train_low_data_max_channel = histeq(train_low_data_max_chan)
+        train_low_data_eq.append(train_low_data_max_channel)
 
     eval_low_data = []
-    eval_high_data = []
-
-    eval_low_data_name = glob(args.eval_low_dir + '/*.*')
+    eval_low_data_name = glob(args.eval_low_dir + '/*.*')  # Modified to accept any extension
 
     for idx in range(len(eval_low_data_name)):
-        eval_low_im = load_images(eval_low_data_name[idx], img_type='hsi')
+        eval_low_im = load_images(eval_low_data_name[idx])
         eval_low_data.append(eval_low_im)
 
     lowlight_enhance.train(
@@ -106,11 +87,9 @@ def lowlight_train(lowlight_enhance, args):
         sample_dir=args.sample_dir, 
         ckpt_dir=os.path.join(args.ckpt_dir, 'Decom'), 
         eval_every_epoch=args.eval_every_epoch, 
-        train_phase="Decom"
-        )
-
-    # lowlight_enhance.train(train_low_data, train_high_data, eval_low_data, batch_size=args.batch_size, patch_size=args.patch_size, epoch=args.epoch, lr=lr, sample_dir=args.sample_dir, ckpt_dir=os.path.join(args.ckpt_dir, 'Relight'), eval_every_epoch=args.eval_every_epoch, train_phase="Relight")
-
+        train_phase="Decom",
+        plot_every_epoch=args.plot_every_epoch
+    )
 
 def lowlight_test(lowlight_enhance, args):
     if args.test_dir == None:
@@ -120,12 +99,13 @@ def lowlight_test(lowlight_enhance, args):
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
 
-    test_low_data_name = glob(os.path.join(args.test_dir) + '/*.*')
+    test_low_data_name = glob(os.path.join(args.test_dir) + '/*.*')  # Modified to accept any extension
     test_low_data = []
     test_high_data = []
-    print(test_low_data_name)
+    
+    print("Found test files:", test_low_data_name)
     for idx in range(len(test_low_data_name)):
-        test_low_im = load_images(test_low_data_name[idx], img_type='hsi')
+        test_low_im = load_images(test_low_data_name[idx])
         test_low_data.append(test_low_im)
 
     lowlight_enhance.test(
@@ -134,7 +114,7 @@ def lowlight_test(lowlight_enhance, args):
         test_low_data_name, 
         save_dir=args.save_dir, 
         decom_flag=args.decom
-        )
+    )
 
 def main(args):
     if args.use_gpu:
@@ -142,7 +122,11 @@ def main(args):
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_idx
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=args.gpu_mem)
         with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
-            model = lowlight_enhance(sess)
+            # Get number of channels from first image if not specified
+            if args.channels is None:
+                first_image = load_images(glob(args.train_low_dir + '/*.*')[0])
+                args.channels = first_image.shape[-1]
+            model = lowlight_enhance(sess, input_channels=args.channels)
             if args.phase == 'train':
                 lowlight_train(model, args)
             elif args.phase == 'test':
@@ -169,20 +153,22 @@ if __name__ == '__main__':
     args.gpu_idx = '0'
     args.gpu_mem = float(0.8)
     args.decom = 1
-    args.sample_dir = './data/eval_results'
+    args.sample_dir = './data/eval_results_hsi'
 
     args.phase = 'train'
-    args.epoch = 600
-    args.batch_size = 16
+    args.epoch = 1000
+    args.batch_size = 1
     args.patch_size = 48
     args.start_lr = 1e-3
     args.eval_every_epoch = 100
+    args.plot_every_epoch = 5
 
-    args.ckpt_dir = './checkpoint'
-    args.save_dir = './data/test_results'
-    args.test_dir = './data/test'
+    args.ckpt_dir = './checkpoint_hsi'
+    args.save_dir = './data/test_results_hsi'
+    args.test_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/test'
+    args.channels = 31
 
-    args.train_low_dir = './data/our485/low'
-    args.eval_low_dir = './data/eval15/low'
+    args.train_low_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/train'
+    args.eval_low_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/eval'
 
     main(args)
