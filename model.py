@@ -359,7 +359,7 @@ class lowlight_enhance(object):
             print("[*] Failed to load model from %s" % ckpt_dir)
             return False, 0
 
-    def test(self, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag):
+    def test(self, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag, lum_factor):
         tf.global_variables_initializer().run()
 
         print("[*] Reading checkpoint...")
@@ -382,13 +382,15 @@ class lowlight_enhance(object):
                 [self.output_R_low, self.output_I_low, self.output_S_low_zy], 
                 feed_dict={self.input_low: input_low_test}
             )
+            enhanced_im = tf.pow(I_low, lum_factor) * R_low
 
             if(idx != 0):
                 total_run_time += time.time() - start_time
                 
             if decom_flag == decom_flag:
-                save_images(os.path.join(save_dir, name + "_R_low." + suffix), R_low)
-                save_images(os.path.join(save_dir, name + "_I_low." + suffix), I_low)
+                save_images(os.path.join(save_dir, name + "_R." + suffix), R_low)
+                save_images(os.path.join(save_dir, name + "_I." + suffix), I_low)
+                save_images(os.path.join(save_dir, name + "_enhanced." + suffix), enhanced_im)
 
         ave_run_time = total_run_time / (float(len(test_low_data))-1)
         print("[*] Average run time: %.4f" % ave_run_time)

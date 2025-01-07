@@ -39,7 +39,7 @@ def data_augmentation(image, mode):
         image = np.rot90(image, k=3)
         return np.flipud(image)
 
-def load_hsi(file, matContentHeader='ref', normalize='self', globalMax=None):
+def load_hsi(file, matContentHeader='ref', normalize='self', globalMax=None, globalMin=None):
     mat = sio.loadmat(file)
     mat = mat[matContentHeader]
     mat = mat.astype('float32')
@@ -53,17 +53,21 @@ def load_hsi(file, matContentHeader='ref', normalize='self', globalMax=None):
             if globalMax == None:
                 raise("Error: max value is not provided for normalization.")
             else:
-                x = x / globalMax
+                if globalMin == None:
+                    globalMin = 0.
+                if globalMin > globalMax:
+                    raise("Error: min value cannot be larger than the max value for normalization.")
+                x = (x - globalMin) / (globalMax - globalMin)
 
     return x
 
-def load_images(file, matContentHeader='ref', normalize=None, globalMax=None):
+def load_images(file, matContentHeader='ref', normalize=None, globalMax=None, globalMin=None):
     """Load hyperspectral images. Assumes data is stored in a format that can be read as a numpy array."""
 
     # Modified to handle hyperspectral data
     try:
         # Try loading as hyperspectral data
-        data = load_hsi(file, matContentHeader, normalize, globalMax)
+        data = load_hsi(file, matContentHeader, normalize, globalMax, globalMin)
         # Normalize to [0, 1]
         return (data.astype("float32") / np.max(data))
     except:
