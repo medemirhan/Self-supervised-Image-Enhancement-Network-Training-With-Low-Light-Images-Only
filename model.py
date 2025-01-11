@@ -1,15 +1,17 @@
-#coding=utf-8
-from __future__ import print_function
-
 import os
 import time
 import tensorflow as tf
 import numpy as np
+from datetime import datetime
 from utils import *
 from scipy.ndimage import maximum_filter
 
 tf.compat.v1.disable_eager_execution()
 tf = tf.compat.v1  # Alias tf.compat.v1 as tf
+
+seed_value = 42
+tf.set_random_seed(seed_value)
+np.random.seed(seed_value)
 
 def concat(layers):
     return tf.concat(layers, axis=3)
@@ -56,6 +58,7 @@ class lowlight_enhance(object):
         self.sess = sess
         self.DecomNet_layer_num = 5
         self.input_channels = input_channels  # Store channel count
+        self.model_timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
         
         # Store average losses per epoch
         self.epoch_losses = {
@@ -145,8 +148,9 @@ class lowlight_enhance(object):
                 result_1, result_2 = self.sess.run([self.output_R_low, self.output_I_low], 
                                                  feed_dict={self.input_low: input_low_eval})
 
-            save_images(os.path.join(sample_dir, 'eval_%s_%d_%d.png' % (train_phase, idx + 1, epoch_num)), 
-                       result_1, result_2)
+            mat_path = os.path.join(sample_dir, 'eval_%s_%d_%d.png' % (train_phase, idx + 1, epoch_num))
+            save_hsi(mat_path, result_1, postfix='_R')
+            save_hsi(mat_path, result_2, postfix='_I')
 
     def plot_loss_curve(self, save_path='loss_curve.png'):
         """Plot and save all training loss curves with epoch numbers"""
@@ -206,10 +210,13 @@ class lowlight_enhance(object):
         plt.close()
         print(f"Loss curves saved to {save_path}")
 
-    def train(self, train_low_data, train_low_data_eq, eval_low_data, train_high_data, batch_size, patch_size, epoch, lr, sample_dir, ckpt_dir, eval_every_epoch, train_phase, plot_every_epoch=10):
+    def train(self, train_low_data, train_low_data_eq, eval_low_data, train_high_data, batch_size, patch_size, epoch, lr, eval_dir, ckpt_dir, eval_every_epoch, train_phase, plot_every_epoch=10):
         """
         Added plot_every_epoch parameter to control how often we plot losses
         """
+        eval_dir += '_' + self.model_timestamp
+        ckpt_dir = os.path.join(ckpt_dir, 'Decom_' + self.model_timestamp)
+        
         # Get channel dimension from input data
         h, w, channels = train_low_data[0].shape  # 3D array: height, width, channels
         numBatch = len(train_low_data) // int(batch_size)
@@ -327,12 +334,12 @@ class lowlight_enhance(object):
             # Plot losses every plot_every_epoch epochs
             if plot_every_epoch > 0 and (epoch + 1) % plot_every_epoch == 0:
                 print(f"\nPlotting loss curves at epoch {epoch + 1}")
-                loss_plot_path = os.path.join(sample_dir, 'loss_curves.png')
+                loss_plot_path = os.path.join(eval_dir, 'loss_curves.png')
                 self.plot_loss_curve(loss_plot_path)
 
             # evaluate the model and save a checkpoint file for it
             if (epoch + 1) % eval_every_epoch == 0:
-                self.evaluate(epoch + 1, eval_low_data, sample_dir=sample_dir, train_phase=train_phase)
+                self.evaluate(epoch + 1, eval_low_data, sample_dir=eval_dir, train_phase=train_phase)
                 self.save(saver, iter_num, ckpt_dir, "RetinexNet-%s" % train_phase)
 
         print("[*] Finish training for phase %s." % train_phase)
@@ -359,11 +366,13 @@ class lowlight_enhance(object):
             print("[*] Failed to load model from %s" % ckpt_dir)
             return False, 0
 
-    def test(self, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag, lum_factor):
+    def test(self, model_dir, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag, lum_factor):
         tf.global_variables_initializer().run()
 
+        model_dir = os.path.join(model_dir)
+
         print("[*] Reading checkpoint...")
-        load_model_status_Decom, _ = self.load(self.saver_Decom, './checkpoint/Decom')
+        load_model_status_Decom, _ = self.load(self.saver_Decom, model_dir)
         if load_model_status_Decom:
             print("[*] Load weights successfully...")
         
@@ -382,17 +391,16 @@ class lowlight_enhance(object):
                 [self.output_R_low, self.output_I_low, self.output_S_low_zy], 
                 feed_dict={self.input_low: input_low_test}
             )
-            enhanced_im = tf.pow(I_low, lum_factor) * R_low
-            #enhanced_im = np.power(I_low, lum_factor) * R_low
+            enhanced_im = np.power(I_low, lum_factor) * R_low
             #enhanced_im = enhanced_im * (0.2173913 - 0.0708354) + 0.0708354
 
             if(idx != 0):
                 total_run_time += time.time() - start_time
                 
             if decom_flag == decom_flag:
-                save_images(os.path.join(save_dir, name + "_R." + suffix), R_low)
-                save_images(os.path.join(save_dir, name + "_I." + suffix), I_low)
-                save_images(os.path.join(save_dir, name + "_enhanced." + suffix), enhanced_im)
+                save_hsi(os.path.join(save_dir, name + "_R." + suffix), R_low)
+                save_hsi(os.path.join(save_dir, name + "_I." + suffix), I_low)
+                save_hsi(os.path.join(save_dir, name + "_enhanced." + suffix), enhanced_im)
 
         ave_run_time = total_run_time / (float(len(test_low_data))-1)
         print("[*] Average run time: %.4f" % ave_run_time)

@@ -1,15 +1,16 @@
-#coding=utf-8
-from __future__ import print_function
 import os
 import argparse
 from glob import glob
-
 import tensorflow as tf
 from model import lowlight_enhance
 from utils import *
 
 tf.compat.v1.disable_eager_execution()
 tf = tf.compat.v1  # Alias tf.compat.v1 as tf
+
+seed_value = 42
+tf.set_random_seed(seed_value)
+np.random.seed(seed_value)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Hyperspectral Image Enhancement')
@@ -37,10 +38,10 @@ def parse_args():
     return parser.parse_args()
 
 def lowlight_train(lowlight_enhance, args):
-    if not os.path.exists(args.ckpt_dir):
-        os.makedirs(args.ckpt_dir)
-    if not os.path.exists(args.sample_dir):
-        os.makedirs(args.sample_dir)
+    if not os.path.exists(args.model_ckpt_dir):
+        os.makedirs(args.model_ckpt_dir)
+    if not os.path.exists(args.eval_result_dir):
+        os.makedirs(args.eval_result_dir)
 
     lr = args.start_lr * np.ones([args.epoch])
     lr[40:] = lr[0] / 10.0
@@ -50,17 +51,17 @@ def lowlight_train(lowlight_enhance, args):
     train_low_data_eq = []
 
     # Load training data
-    train_low_data_names = glob(args.train_low_dir + '/*.*')  # Modified to accept any extension
+    train_low_data_names = glob(args.train_data + '/*.*')  # Modified to accept any extension
     train_low_data_names.sort()
-    train_high_data_names = glob(args.train_low_dir + '/*.*')  # Modified to accept any extension
+    train_high_data_names = glob(args.train_data + '/*.*')  # Modified to accept any extension
     train_high_data_names.sort()
     assert len(train_low_data_names) == len(train_high_data_names)
     print('[*] Number of training data: %d' % len(train_low_data_names))
 
     for idx in range(len(train_low_data_names)):
-        low_im = load_images(train_low_data_names[idx], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+        low_im = load_hsi(train_low_data_names[idx], matContentHeader=args.mat_key, normalize='global', maxVal=args.global_max, minVal=args.global_min)
         train_low_data.append(low_im)
-        high_im = load_images(train_high_data_names[idx], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+        high_im = load_hsi(train_high_data_names[idx], matContentHeader=args.mat_key, normalize='global', maxVal=args.global_max, minVal=args.global_min)
         train_high_data.append(high_im)
         
         # Calculate max channel for equalization (across all spectral bands)
@@ -69,10 +70,10 @@ def lowlight_train(lowlight_enhance, args):
         train_low_data_eq.append(train_low_data_max_channel)
 
     eval_low_data = []
-    eval_low_data_name = glob(args.eval_low_dir + '/*.*')  # Modified to accept any extension
+    eval_low_data_name = glob(args.eval_data + '/*.*')  # Modified to accept any extension
 
     for idx in range(len(eval_low_data_name)):
-        eval_low_im = load_images(eval_low_data_name[idx], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+        eval_low_im = load_hsi(eval_low_data_name[idx], matContentHeader=args.mat_key, normalize='global', maxVal=args.global_max, minVal=args.global_min)
         eval_low_data.append(eval_low_im)
 
     lowlight_enhance.train(
@@ -84,35 +85,40 @@ def lowlight_train(lowlight_enhance, args):
         patch_size=args.patch_size, 
         epoch=args.epoch, 
         lr=lr, 
-        sample_dir=args.sample_dir, 
-        ckpt_dir=os.path.join(args.ckpt_dir, 'Decom'), 
+        eval_dir=args.eval_result_dir, 
+        ckpt_dir=args.model_ckpt_dir, 
         eval_every_epoch=args.eval_every_epoch, 
         train_phase="Decom",
         plot_every_epoch=args.plot_every_epoch
     )
 
 def lowlight_test(lowlight_enhance, args):
-    if args.test_dir == None:
+    if args.test_data == None:
         print("[!] please provide --test_dir")
         exit(0)
+    
+    if args.test_model_dir == None:
+        print("[!] please provide --test_model_dir")
+        exit(0)
 
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
+    if not os.path.exists(args.test_result_dir):
+        os.makedirs(args.test_result_dir)
 
-    test_low_data_name = glob(os.path.join(args.test_dir) + '/*.*')  # Modified to accept any extension
+    test_low_data_name = glob(os.path.join(args.test_data) + '/*.*')  # Modified to accept any extension
     test_low_data = []
     test_high_data = []
     
     print("Found test files:", test_low_data_name)
     for idx in range(len(test_low_data_name)):
-        test_low_im = load_images(test_low_data_name[idx], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+        test_low_im = load_hsi(test_low_data_name[idx], matContentHeader=args.mat_key, normalize='global', maxVal=args.global_max, minVal=args.global_min)
         test_low_data.append(test_low_im)
 
     lowlight_enhance.test(
-        test_low_data, 
-        test_high_data, 
-        test_low_data_name, 
-        save_dir=args.save_dir, 
+        model_dir=args.test_model_dir,
+        test_low_data=test_low_data, 
+        test_high_data=test_high_data, 
+        test_low_data_names=test_low_data_name, 
+        save_dir=args.test_result_dir, 
         decom_flag=args.decom,
         lum_factor=args.lum_factor
     )
@@ -125,7 +131,7 @@ def main(args):
         with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
             # Get number of channels from first image if not specified
             if args.channels is None:
-                first_image = load_images(glob(args.train_low_dir + '/*.*')[0], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+                first_image = load_hsi(glob(args.train_data + '/*.*')[0], matContentHeader=args.mat_key, normalize='global', maxVal=args.global_max, minVal=args.global_min)
                 args.channels = first_image.shape[-1]
             model = lowlight_enhance(sess, input_channels=args.channels)
             if args.phase == 'train':
@@ -150,33 +156,38 @@ def main(args):
 if __name__ == '__main__':
     args = Struct()
 
+    # Common args
     args.use_gpu = 1
     args.gpu_idx = '0'
     args.gpu_mem = float(0.8)
     args.decom = 1
-    args.sample_dir = './data/eval_results'
-    args.mat_key = 'data'
 
-    args.phase = 'train'
-    args.epoch = 1000
-    args.batch_size = 1
-    args.patch_size = 48
-    args.start_lr = 1e-3
-    args.eval_every_epoch = 100
-    args.plot_every_epoch = 5
-
-    args.ckpt_dir = './checkpoint'
-    args.save_dir = './data/test_results'
-    args.test_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/test'
+    # Data related args
+    args.mat_key = 'ref'
     args.channels = 31
-
     args.global_min = 0.
     args.global_max = 0.005019044472441
     #args.global_min = 0.0708354
     #args.global_max = 0.2173913
-    args.lum_factor = 0.2
 
-    args.train_low_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/train'
-    args.eval_low_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/eval'
+    # Directories
+    args.model_ckpt_dir = './checkpoint'
+    args.train_data = '../PairLIE/data/CZ_hsdb/lowered_1.9/train'
+    args.eval_data = '../PairLIE/data/CZ_hsdb/lowered_1.9/eval'
+    args.test_data = '../PairLIE/data/CZ_hsdb/lowered_1.9/test'
+    
+    args.eval_result_dir = 'D:/sslie/eval_results'
+    args.test_result_dir = 'D:/sslie/test_results'
+    args.test_model_dir = './checkpoint/Decom_20250112_005805'
+
+    # Train and Eval related args
+    args.phase = 'train'
+    args.epoch = 600
+    args.batch_size = 1
+    args.patch_size = 48
+    args.start_lr = 1e-4
+    args.eval_every_epoch = 100
+    args.plot_every_epoch = 5
+    args.lum_factor = 0.2
 
     main(args)
