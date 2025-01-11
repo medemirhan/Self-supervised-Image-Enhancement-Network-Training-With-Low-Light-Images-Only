@@ -58,9 +58,9 @@ def lowlight_train(lowlight_enhance, args):
     print('[*] Number of training data: %d' % len(train_low_data_names))
 
     for idx in range(len(train_low_data_names)):
-        low_im = load_images(train_low_data_names[idx], normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+        low_im = load_images(train_low_data_names[idx], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
         train_low_data.append(low_im)
-        high_im = load_images(train_high_data_names[idx], normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+        high_im = load_images(train_high_data_names[idx], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
         train_high_data.append(high_im)
         
         # Calculate max channel for equalization (across all spectral bands)
@@ -72,7 +72,7 @@ def lowlight_train(lowlight_enhance, args):
     eval_low_data_name = glob(args.eval_low_dir + '/*.*')  # Modified to accept any extension
 
     for idx in range(len(eval_low_data_name)):
-        eval_low_im = load_images(eval_low_data_name[idx], normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+        eval_low_im = load_images(eval_low_data_name[idx], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
         eval_low_data.append(eval_low_im)
 
     lowlight_enhance.train(
@@ -105,7 +105,7 @@ def lowlight_test(lowlight_enhance, args):
     
     print("Found test files:", test_low_data_name)
     for idx in range(len(test_low_data_name)):
-        test_low_im = load_images(test_low_data_name[idx], normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+        test_low_im = load_images(test_low_data_name[idx], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
         test_low_data.append(test_low_im)
 
     lowlight_enhance.test(
@@ -125,7 +125,7 @@ def main(args):
         with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
             # Get number of channels from first image if not specified
             if args.channels is None:
-                first_image = load_images(glob(args.train_low_dir + '/*.*')[0], normalize='global', globalMax=args.global_max, globalMin=args.global_min)
+                first_image = load_images(glob(args.train_low_dir + '/*.*')[0], matContentHeader=args.mat_key, normalize='global', globalMax=args.global_max, globalMin=args.global_min)
                 args.channels = first_image.shape[-1]
             model = lowlight_enhance(sess, input_channels=args.channels)
             if args.phase == 'train':
@@ -155,6 +155,7 @@ if __name__ == '__main__':
     args.gpu_mem = float(0.8)
     args.decom = 1
     args.sample_dir = './data/eval_results'
+    args.mat_key = 'data'
 
     args.phase = 'train'
     args.epoch = 1000
@@ -168,6 +169,12 @@ if __name__ == '__main__':
     args.save_dir = './data/test_results'
     args.test_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/test'
     args.channels = 31
+
+    args.global_min = 0.
+    args.global_max = 0.005019044472441
+    #args.global_min = 0.0708354
+    #args.global_max = 0.2173913
+    args.lum_factor = 0.2
 
     args.train_low_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/train'
     args.eval_low_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/eval'

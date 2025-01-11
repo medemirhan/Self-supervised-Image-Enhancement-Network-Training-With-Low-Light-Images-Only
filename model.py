@@ -383,6 +383,8 @@ class lowlight_enhance(object):
                 feed_dict={self.input_low: input_low_test}
             )
             enhanced_im = tf.pow(I_low, lum_factor) * R_low
+            #enhanced_im = np.power(I_low, lum_factor) * R_low
+            #enhanced_im = enhanced_im * (0.2173913 - 0.0708354) + 0.0708354
 
             if(idx != 0):
                 total_run_time += time.time() - start_time
