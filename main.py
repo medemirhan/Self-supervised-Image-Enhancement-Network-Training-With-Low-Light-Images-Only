@@ -186,7 +186,7 @@ if __name__ == '__main__':
     args.epoch = 600
     args.batch_size = 1
     args.patch_size = 48
-    args.start_lr = 1000
+    args.start_lr = 1e-3
     args.lr_div_period = 100
     args.lr_div_factor = 3
     args.eval_every_epoch = 100
