@@ -42,7 +42,7 @@ def load_hsi(file, matContentHeader='ref', normalize=None, maxVal=None, minVal=N
     x = np.array(mat, dtype='float32')
 
     if normalize == 'self':
-        x = x / np.amax(mat)
+        x = x / np.max(mat)
     elif normalize == 'global':
         if maxVal == None:
             raise("Error: max value is not provided for normalization.")
@@ -80,3 +80,16 @@ def histeq(im, nbr_bins=256):
         output[:,:,i] = im2.reshape(im[:,:,i].shape)
     
     return output
+
+def adaptive_lr(num_epochs, divide_period, divide_by, initial_value):
+    # Create an array to store the result
+    arr = np.zeros(num_epochs)
+    
+    current_value = initial_value
+    for i in range(0, num_epochs, divide_period):
+        # Set the next divide_period elements to the current value
+        arr[i:i+divide_period] = current_value
+        # Divide the value by divide_by for the next block
+        current_value /= divide_by
+    
+    return arr

@@ -45,6 +45,7 @@ def lowlight_train(lowlight_enhance, args):
 
     lr = args.start_lr * np.ones([args.epoch])
     lr[40:] = lr[0] / 10.0
+    #lr = adaptive_lr(args.epoch, args.lr_div_period, args.lr_div_factor, args.start_lr)
 
     train_low_data = []
     train_high_data = []
@@ -185,7 +186,9 @@ if __name__ == '__main__':
     args.epoch = 600
     args.batch_size = 1
     args.patch_size = 48
-    args.start_lr = 1e-4
+    args.start_lr = 1000
+    args.lr_div_period = 100
+    args.lr_div_factor = 3
     args.eval_every_epoch = 100
     args.plot_every_epoch = 5
     args.lum_factor = 0.2
