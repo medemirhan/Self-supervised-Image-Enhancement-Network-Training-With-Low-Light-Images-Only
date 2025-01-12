@@ -49,6 +49,10 @@ def load_hsi(file, matContentHeader='ref', normalization=None, max_val=None, min
         x = per_channel_normalization(x)
     elif normalization == 'per_channel_standardize':
         x = per_channel_standardization(x)
+    elif normalization == None:
+        pass
+    else:
+        raise NotImplementedError(normalization + ' is not implemented')
 
     return x
 
