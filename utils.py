@@ -43,11 +43,11 @@ def load_hsi(file, matContentHeader='ref', normalization=None, max_val=None, min
 
     if normalization == 'self':
         x = self_normalization(x)
-    elif normalization == 'global':
+    elif normalization == 'global_normalization':
         x = global_normalization(x, max_val, min_val)
-    elif normalization == 'per_channel_norm':
+    elif normalization == 'per_channel_normalization':
         x = per_channel_normalization(x)
-    elif normalization == 'per_channel_standardize':
+    elif normalization == 'per_channel_standardization':
         x = per_channel_standardization(x)
     elif normalization == None:
         pass
@@ -68,7 +68,9 @@ def per_channel_normalization(x):
     range_vals = np.where(max_vals > min_vals, max_vals - min_vals, 1)
     
     # Normalize each channel independently
-    return (x - min_vals) / range_vals
+    result = (x - min_vals) / range_vals
+
+    return result
 
 def global_normalization(x, max_val=None, min_val=None):
     """
@@ -102,7 +104,69 @@ def per_channel_standardization(x):
     std_vals = np.where(std_vals > 0, std_vals, 1)
 
     # Standardize each channel independently
-    return (x - mean_vals) / std_vals
+    result = (x - mean_vals) / std_vals
+
+    return result
+
+def inverse_per_channel_normalization(predictions, min_vals, max_vals):
+    """
+    Inverse scaling for Per-Channel Normalization.
+
+    Parameters:
+        predictions (numpy.ndarray): Normalized predictions, shape (H, W, C).
+        min_vals (numpy.ndarray): Minimum values per channel, shape (1, 1, C).
+        max_vals (numpy.ndarray): Maximum values per channel, shape (1, 1, C).
+
+    Returns:
+        numpy.ndarray: Predictions scaled back to the original range.
+    """
+    # Ensure the input is a NumPy array
+    predictions = np.asarray(predictions)
+    
+    # Undo normalization
+    original_predictions = predictions * (max_vals - min_vals) + min_vals
+
+    return original_predictions
+
+def inverse_global_normalization(predictions, global_min, global_max):
+    """
+    Inverse scaling for Global Normalization.
+
+    Parameters:
+        predictions (numpy.ndarray): Normalized predictions, shape (H, W, C).
+        global_min (float): Global minimum value from the training set.
+        global_max (float): Global maximum value from the training set.
+
+    Returns:
+        numpy.ndarray: Predictions scaled back to the original range.
+    """
+    # Ensure the input is a NumPy array
+    predictions = np.asarray(predictions)
+    
+    # Undo normalization
+    original_predictions = predictions * (global_max - global_min) + global_min
+
+    return original_predictions
+
+def inverse_per_channel_standardization(predictions, mean_vals, std_vals):
+    """
+    Inverse scaling for Per-Channel Standardization.
+
+    Parameters:
+        predictions (numpy.ndarray): Standardized predictions, shape (H, W, C).
+        mean_vals (numpy.ndarray): Mean values per channel, shape (1, 1, C).
+        std_vals (numpy.ndarray): Standard deviation per channel, shape (1, 1, C).
+
+    Returns:
+        numpy.ndarray: Predictions scaled back to the original range.
+    """
+    # Ensure the input is a NumPy array
+    predictions = np.asarray(predictions)
+    
+    # Undo standardization
+    original_predictions = predictions * std_vals + mean_vals
+
+    return original_predictions
 
 def save_hsi(filepath, data, postfix=None, key='ref'):
     """Save hyperspectral image as .mat file"""

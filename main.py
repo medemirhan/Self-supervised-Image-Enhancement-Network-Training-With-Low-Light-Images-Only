@@ -170,7 +170,7 @@ if __name__ == '__main__':
     args.global_max = 0.005019044472441'''
     args.global_min = 0.0708354
     args.global_max = 0.2173913
-    args.normalization = 'global'
+    args.normalization = 'global_normalization'
 
     # Directories
     args.model_ckpt_dir = './checkpoint'
