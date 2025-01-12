@@ -4,7 +4,9 @@ import tensorflow as tf
 import numpy as np
 from datetime import datetime
 from utils import *
-from scipy.ndimage import maximum_filter
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 tf.compat.v1.disable_eager_execution()
 tf = tf.compat.v1  # Alias tf.compat.v1 as tf
@@ -154,7 +156,6 @@ class lowlight_enhance(object):
 
     def plot_loss_curve(self, save_path='loss_curve.png'):
         """Plot and save all training loss curves with epoch numbers"""
-        import matplotlib.pyplot as plt
         
         epochs = range(1, len(self.epoch_losses['total_loss']) + 1)
         
@@ -398,9 +399,10 @@ class lowlight_enhance(object):
                 total_run_time += time.time() - start_time
                 
             if decom_flag == decom_flag:
-                save_hsi(os.path.join(save_dir, name + "_R." + suffix), R_low)
-                save_hsi(os.path.join(save_dir, name + "_I." + suffix), I_low)
-                save_hsi(os.path.join(save_dir, name + "_enhanced." + suffix), enhanced_im)
+                #save_hsi(os.path.join(save_dir, name + "_R." + suffix), R_low)
+                #save_hsi(os.path.join(save_dir, name + "_I." + suffix), I_low)
+                #save_hsi(os.path.join(save_dir, name + "_enhanced." + suffix), enhanced_im)
+                save_hsi(os.path.join(save_dir, name + "." + suffix), enhanced_im)
 
         ave_run_time = total_run_time / (float(len(test_low_data))-1)
         print("[*] Average run time: %.4f" % ave_run_time)

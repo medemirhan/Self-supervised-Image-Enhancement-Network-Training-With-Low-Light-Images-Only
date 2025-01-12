@@ -164,33 +164,33 @@ if __name__ == '__main__':
     args.decom = 1
 
     # Data related args
-    args.mat_key = 'ref'
-    args.channels = 31
-    args.global_min = 0.
-    args.global_max = 0.005019044472441
-    #args.global_min = 0.0708354
-    #args.global_max = 0.2173913
+    args.mat_key = 'data'
+    args.channels = 64
+    '''args.global_min = 0.
+    args.global_max = 0.005019044472441'''
+    args.global_min = 0.0708354
+    args.global_max = 0.2173913
 
     # Directories
     args.model_ckpt_dir = './checkpoint'
-    args.train_data = '../PairLIE/data/CZ_hsdb/lowered_1.9/train'
-    args.eval_data = '../PairLIE/data/CZ_hsdb/lowered_1.9/eval'
-    args.test_data = '../PairLIE/data/CZ_hsdb/lowered_1.9/test'
+    args.train_data = '../PairLIE/data/hsi_dataset/train'
+    args.eval_data = '../PairLIE/data/hsi_dataset/eval'
+    args.test_data = '../PairLIE/data/hsi_dataset/test'
     
     args.eval_result_dir = 'D:/sslie/eval_results'
-    args.test_result_dir = 'D:/sslie/test_results'
-    args.test_model_dir = './checkpoint/Decom_20250112_005805'
+    args.test_result_dir = 'D:/sslie/test_results_20250112_165938'
+    args.test_model_dir = './checkpoint/Decom_20250112_165938'
 
     # Train and Eval related args
     args.phase = 'train'
     args.epoch = 600
     args.batch_size = 1
-    args.patch_size = 48
+    args.patch_size = 96
     args.start_lr = 1e-3
     args.lr_div_period = 100
     args.lr_div_factor = 3
     args.eval_every_epoch = 100
     args.plot_every_epoch = 5
-    args.lum_factor = 0.2
+    args.lum_factor = 24.5
 
     main(args)
