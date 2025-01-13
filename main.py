@@ -179,8 +179,8 @@ if __name__ == '__main__':
     args.test_data = '../PairLIE/data/hsi_dataset/test'
     
     args.eval_result_dir = 'D:/sslie/eval_results'
-    args.test_result_dir = 'D:/sslie/test_results_20250112_165938'
-    args.test_model_dir = './checkpoint/Decom_20250112_165938'
+    args.test_result_dir = 'D:/sslie/test_results_20250113_010110'
+    args.test_model_dir = './checkpoint/Decom_20250113_010110'
 
     # Train and Eval related args
     args.phase = 'train'

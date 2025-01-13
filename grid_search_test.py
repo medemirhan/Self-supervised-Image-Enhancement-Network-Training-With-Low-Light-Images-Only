@@ -61,9 +61,9 @@ def lowlight_train(lowlight_enhance, args):
     print('[*] Number of training data: %d' % len(train_low_data_names))
 
     for idx in range(len(train_low_data_names)):
-        low_im = load_hsi(train_low_data_names[idx], matContentHeader=args.mat_key, normalization='global', max_val=args.global_max, min_val=args.global_min)
+        low_im = load_hsi(train_low_data_names[idx], matContentHeader=args.mat_key, normalization='global_normalization', max_val=args.global_max, min_val=args.global_min)
         train_low_data.append(low_im)
-        high_im = load_hsi(train_high_data_names[idx], matContentHeader=args.mat_key, normalization='global', max_val=args.global_max, min_val=args.global_min)
+        high_im = load_hsi(train_high_data_names[idx], matContentHeader=args.mat_key, normalization='global_normalization', max_val=args.global_max, min_val=args.global_min)
         train_high_data.append(high_im)
         
         # Calculate max channel for equalization (across all spectral bands)
@@ -75,7 +75,7 @@ def lowlight_train(lowlight_enhance, args):
     eval_low_data_name = glob(args.eval_data + '/*.*')  # Modified to accept any extension
 
     for idx in range(len(eval_low_data_name)):
-        eval_low_im = load_hsi(eval_low_data_name[idx], matContentHeader=args.mat_key, normalization='global', max_val=args.global_max, min_val=args.global_min)
+        eval_low_im = load_hsi(eval_low_data_name[idx], matContentHeader=args.mat_key, normalization='global_normalization', max_val=args.global_max, min_val=args.global_min)
         eval_low_data.append(eval_low_im)
 
     lowlight_enhance.train(
@@ -112,7 +112,7 @@ def lowlight_test(lowlight_enhance, args):
     
     print("Found test files:", test_low_data_name)
     for idx in range(len(test_low_data_name)):
-        test_low_im = load_hsi(test_low_data_name[idx], matContentHeader=args.mat_key, normalization='global', max_val=args.global_max, min_val=args.global_min)
+        test_low_im = load_hsi(test_low_data_name[idx], matContentHeader=args.mat_key, normalization='global_normalization', max_val=args.global_max, min_val=args.global_min)
         test_low_data.append(test_low_im)
 
     lowlight_enhance.test(
@@ -133,7 +133,7 @@ def main(args):
         with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
             # Get number of channels from first image if not specified
             if args.channels is None:
-                first_image = load_hsi(glob(args.train_data + '/*.*')[0], matContentHeader=args.mat_key, normalization='global', max_val=args.global_max, min_val=args.global_min)
+                first_image = load_hsi(glob(args.train_data + '/*.*')[0], matContentHeader=args.mat_key, normalization='global_normalization', max_val=args.global_max, min_val=args.global_min)
                 args.channels = first_image.shape[-1]
             model = lowlight_enhance(sess, input_channels=args.channels)
             if args.phase == 'train':
@@ -178,8 +178,8 @@ if __name__ == '__main__':
     args.test_data = '../PairLIE/data/hsi_dataset/test'
     
     args.eval_result_dir = 'D:/sslie/eval_results'
-    args.test_result_dir = 'D:/sslie/test_results'
-    args.test_model_dir = './checkpoint/Decom_20250112_024528'
+    args.test_result_dir = 'D:/sslie/test_results_20250113_024612'
+    args.test_model_dir = './checkpoint/Decom_20250113_024612'
 
     # Train and Eval related args
     args.phase = 'test'
@@ -192,40 +192,42 @@ if __name__ == '__main__':
     args.eval_every_epoch = 100
     args.plot_every_epoch = 5
     
-    lums = np.arange(20., 30., 0.5)
+    #lums = np.concatenate((np.arange(0.01, 0.09, 0.03), np.arange(0.1, 3.1, 0.4), np.arange(4., 11., 2.)))
+    lums = np.arange(0.11, 0.62, 0.1)
     mins = (0.0708354, None)
 
     log_file_path = "lf_logs.log"
     label_dir = '../PairLIE/data/label_ll'
     test_result_dir = args.test_result_dir
-    with open(log_file_path, "a") as log_file:
-        for lf in lums:
-            for min in mins:
-                args.test_result_dir = os.path.join(test_result_dir, 'lf_' + f"{lf:.1f}")
-                args.lum_factor = lf
-                args.global_min = min
-                main(args)
-                
-                tf.get_variable_scope().reuse_variables()
+    
+    for lf in lums:
+        for min in mins:
+            args.test_result_dir = os.path.join(test_result_dir, 'lf_' + f"{lf:.2f}")
+            args.lum_factor = lf
+            args.global_min = min
+            main(args)
+            
+            tf.get_variable_scope().reuse_variables()
 
-                im_dir = args.test_result_dir + '/*.mat'
+            im_dir = args.test_result_dir + '/*.mat'
 
-                avg_psnr, avg_ssim, avg_sam = metrics.calc_metrics(
-                    im_dir=os.path.normpath(im_dir),
-                    label_dir=os.path.normpath(label_dir),
-                    data_min=args.global_min,
-                    data_max=args.global_max,
-                    matKeyPrediction='ref',
-                    matKeyGt='data'
-                    )
-                
-                if args.global_min == None:
-                    strMin = str(args.global_min)
-                else:
-                    strMin = f"{args.global_min:.3f}"
+            avg_psnr, avg_ssim, avg_sam = metrics.calc_metrics(
+                im_dir=os.path.normpath(im_dir),
+                label_dir=os.path.normpath(label_dir),
+                data_min=args.global_min,
+                data_max=args.global_max,
+                matKeyPrediction='ref',
+                matKeyGt='data'
+                )
+            
+            if args.global_min == None:
+                strMin = str(args.global_min)
+            else:
+                strMin = f"{args.global_min:.3f}"
 
-                # Format the log entry
-                log_entry = f"lf:{lf:.1f}, min:{strMin}, max:{args.global_max:.3f}, mpsnr:{avg_psnr:.3f}, mssim:{avg_ssim:.3f}, msam:{avg_sam:.3f}\n"
+            # Format the log entry
+            log_entry = f"lf:{lf:.2f}, min:{strMin}, max:{args.global_max:.3f}, mpsnr:{avg_psnr:.3f}, mssim:{avg_ssim:.3f}, msam:{avg_sam:.3f}\n"
 
+            with open(log_file_path, "a") as log_file:
                 # Write the log entry to the file
                 log_file.write(log_entry)

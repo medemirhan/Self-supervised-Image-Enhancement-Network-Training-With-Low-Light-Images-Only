@@ -150,6 +150,9 @@ class lowlight_enhance(object):
                 result_1, result_2 = self.sess.run([self.output_R_low, self.output_I_low], 
                                                  feed_dict={self.input_low: input_low_eval})
 
+            '''result_1 = result_1 * (0.2173913 - 0.0708354) + 0.0708354
+            result_2 = result_2 * (0.2173913 - 0.0708354) + 0.0708354'''
+            
             mat_path = os.path.join(sample_dir, 'eval_%s_%d_%d.png' % (train_phase, idx + 1, epoch_num))
             save_hsi(mat_path, result_1, postfix='_R')
             save_hsi(mat_path, result_2, postfix='_I')
@@ -392,8 +395,9 @@ class lowlight_enhance(object):
                 [self.output_R_low, self.output_I_low, self.output_S_low_zy], 
                 feed_dict={self.input_low: input_low_test}
             )
+            '''I_low = I_low * (0.2173913 - 0.0708354) + 0.0708354
+            R_low = R_low * (0.2173913 - 0.0708354) + 0.0708354'''
             enhanced_im = np.power(I_low, lum_factor) * R_low
-            #enhanced_im = enhanced_im * (0.2173913 - 0.0708354) + 0.0708354
 
             if(idx != 0):
                 total_run_time += time.time() - start_time
