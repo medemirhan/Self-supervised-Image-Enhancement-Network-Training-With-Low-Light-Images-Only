@@ -115,6 +115,12 @@ def lowlight_test(lowlight_enhance, args):
         test_low_im = load_hsi(test_low_data_name[idx], matContentHeader=args.mat_key, normalization='global_normalization', max_val=args.global_max, min_val=args.global_min)
         test_low_data.append(test_low_im)
 
+    data_min = None
+    data_max = None
+    if args.post_scale:
+        data_min = args.global_min
+        data_max = args.global_max
+
     lowlight_enhance.test(
         model_dir=args.test_model_dir,
         test_low_data=test_low_data, 
@@ -122,7 +128,9 @@ def lowlight_test(lowlight_enhance, args):
         test_low_data_names=test_low_data_name, 
         save_dir=args.test_result_dir, 
         decom_flag=args.decom,
-        lum_factor=args.lum_factor
+        lum_factor=args.lum_factor,
+        data_min=data_min,
+        data_max=data_max
     )
 
 def main(args):
@@ -169,6 +177,7 @@ if __name__ == '__main__':
     args.channels = 64
     '''args.global_min = 0.
     args.global_max = 0.005019044472441'''
+    args.global_min = 0.0708354
     args.global_max = 0.2173913
 
     # Directories
@@ -178,8 +187,8 @@ if __name__ == '__main__':
     args.test_data = '../PairLIE/data/hsi_dataset/test'
     
     args.eval_result_dir = 'D:/sslie/eval_results'
-    args.test_result_dir = 'D:/sslie/test_results_20250113_024612'
-    args.test_model_dir = './checkpoint/Decom_20250113_024612'
+    args.test_result_dir = 'D:/sslie/test_results_20250115_005313'
+    args.test_model_dir = './checkpoint/Decom_20250115_005313'
 
     # Train and Eval related args
     args.phase = 'test'
@@ -193,8 +202,10 @@ if __name__ == '__main__':
     args.plot_every_epoch = 5
     
     #lums = np.concatenate((np.arange(0.01, 0.09, 0.03), np.arange(0.1, 3.1, 0.4), np.arange(4., 11., 2.)))
-    lums = np.arange(0.11, 0.62, 0.1)
+    lums = np.concatenate((np.arange(0.01, 0.09, 0.03), np.arange(0.1, 3.1, 0.4)))
+    #lums = np.arange(0.11, 0.62, 0.1)
     mins = (0.0708354, None)
+    args.post_scale = True
 
     log_file_path = "lf_logs.log"
     label_dir = '../PairLIE/data/label_ll'

@@ -114,6 +114,12 @@ def lowlight_test(lowlight_enhance, args):
         test_low_im = load_hsi(test_low_data_name[idx], matContentHeader=args.mat_key, normalization=args.normalization, max_val=args.global_max, min_val=args.global_min)
         test_low_data.append(test_low_im)
 
+    data_min = None
+    data_max = None
+    if args.post_scale:
+        data_min = args.global_min
+        data_max = args.global_max
+
     lowlight_enhance.test(
         model_dir=args.test_model_dir,
         test_low_data=test_low_data, 
@@ -121,7 +127,9 @@ def lowlight_test(lowlight_enhance, args):
         test_low_data_names=test_low_data_name, 
         save_dir=args.test_result_dir, 
         decom_flag=args.decom,
-        lum_factor=args.lum_factor
+        lum_factor=args.lum_factor,
+        data_min=data_min,
+        data_max=data_max
     )
 
 def main(args):
@@ -193,5 +201,6 @@ if __name__ == '__main__':
     args.eval_every_epoch = 100
     args.plot_every_epoch = 5
     args.lum_factor = 24.5
+    args.post_scale = False
 
     main(args)

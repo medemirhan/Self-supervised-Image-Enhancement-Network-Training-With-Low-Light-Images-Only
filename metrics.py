@@ -77,17 +77,20 @@ if __name__ == '__main__':
     normalLightMin = 0.0708354
     normalLightMax = 1.7410845
 
-    globalMin = 0.
-    globalMax = 0.005019044472441
+    '''globalMin = 0.
+    globalMax = 0.005019044472441'''
 
-    '''im_dir = 'D:/sslie/test_results_3rd/non_scaled/renamed/*.mat'
-    label_dir = '../PairLIE/data/label_ll'''
+    globalMin = 0.0708354
+    globalMax = 0.2173913
+
+    im_dir = 'D:/sslie/test_results_3rd/non_scaled/renamed/*.mat'
+    label_dir = '../PairLIE/data/label_ll'
 
     '''im_dir = 'D:/sslie/test_results_2nd/non_scaled/renamed/*.mat'
     label_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/gt'''
 
-    im_dir = 'D:/sslie/test_results_20250112_165938/*.mat'
-    label_dir = '../PairLIE/data/label_ll'
+    '''im_dir = 'D:/sslie/test_results_20250112_165938/*.mat'
+    label_dir = '../PairLIE/data/label_ll'''
 
     avg_psnr, avg_ssim, avg_sam = calc_metrics(
         im_dir=os.path.normpath(im_dir),

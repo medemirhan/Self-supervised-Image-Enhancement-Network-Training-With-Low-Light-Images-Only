@@ -123,6 +123,41 @@ class lowlight_enhance(object):
         self.saver_Decom = tf.train.Saver(var_list=self.var_Decom)
         print("[*] Initialize model successfully...")
 
+        #self.print_band_weights()
+
+    def generate_band_weights(self):
+        """Generate weights for each band using polynomial decay"""
+        weights = np.zeros(self.input_channels)
+        for band in range(self.input_channels):
+            # Convert band index to step for polynomial decay
+            # band 0 should have highest penalty
+            step = band
+            
+            # Parameters for polynomial decay
+            initial_value = 5.0
+            decay_rate = 0.3  # Adjust this to control decay speed
+            power = 2.0       # Adjust this to control decay shape
+            
+            weights[band] = polynomial_decay(initial_value, decay_rate, power, step)
+            
+        # Normalize weights
+        #weights = weights / np.max(weights)
+        return tf.constant(weights, dtype=tf.float32)
+
+    def weighted_reconstruction_loss(self, pred, target):
+        """Calculate band-weighted reconstruction loss"""
+        # Expand weights to match batch dimensions
+        weights_expanded = tf.reshape(self.band_weights, [1, 1, 1, -1])
+        
+        # Calculate absolute difference for each band
+        pixel_wise_loss = tf.abs(pred - target)
+        
+        # Apply band-specific weights
+        weighted_loss = pixel_wise_loss * weights_expanded
+        
+        # Average across all dimensions
+        return tf.reduce_mean(weighted_loss)
+
     def gradient(self, input_tensor, direction):
         self.smooth_kernel_x = tf.reshape(tf.constant([[0, 0], [-1, 1]], tf.float32), [2, 2, 1, 1])
         self.smooth_kernel_y = tf.transpose(self.smooth_kernel_x, [1, 0, 2, 3])
@@ -370,7 +405,7 @@ class lowlight_enhance(object):
             print("[*] Failed to load model from %s" % ckpt_dir)
             return False, 0
 
-    def test(self, model_dir, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag, lum_factor):
+    def test(self, model_dir, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag, lum_factor, data_min=None, data_max=None):
         tf.global_variables_initializer().run()
 
         model_dir = os.path.join(model_dir)
@@ -395,8 +430,10 @@ class lowlight_enhance(object):
                 [self.output_R_low, self.output_I_low, self.output_S_low_zy], 
                 feed_dict={self.input_low: input_low_test}
             )
-            '''I_low = I_low * (0.2173913 - 0.0708354) + 0.0708354
-            R_low = R_low * (0.2173913 - 0.0708354) + 0.0708354'''
+
+            if data_min != None and data_max != None:
+                I_low = I_low * (data_max - data_min) + data_min
+                R_low = R_low * (data_max - data_min) + data_min
             enhanced_im = np.power(I_low, lum_factor) * R_low
 
             if(idx != 0):
@@ -410,3 +447,14 @@ class lowlight_enhance(object):
 
         ave_run_time = total_run_time / (float(len(test_low_data))-1)
         print("[*] Average run time: %.4f" % ave_run_time)
+
+    def print_band_weights(self):
+        """Debug function to print band weights"""
+        weights = self.sess.run(self.band_weights)
+        plt.figure()
+        plt.plot(weights)
+        plt.show()
+        plt.title('band weights for reconstruction loss')
+        plt.xlabel('band #')
+        plt.ylabel('weight')
+        plt.grid(True)

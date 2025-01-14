@@ -204,3 +204,18 @@ def adaptive_lr(num_epochs, divide_period, divide_by, initial_value):
         current_value /= divide_by
     
     return arr
+
+def polynomial_decay(initial_value, decay_rate, power, step):
+    """
+    Polynomial decay function.
+
+    Parameters:
+        initial_value (float): The initial value before decay.
+        decay_rate (float): The rate of decay.
+        power (float): The power to which the step is raised.
+        step (int or float): The current step.
+
+    Returns:
+        float: The decayed value.
+    """
+    return initial_value / (1 + decay_rate * step) ** power
