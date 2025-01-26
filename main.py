@@ -77,6 +77,11 @@ def lowlight_train(lowlight_enhance, args):
         eval_low_im = load_hsi(eval_low_data_name[idx], matContentHeader=args.mat_key, normalization=args.normalization, max_val=args.global_max, min_val=args.global_min)
         eval_low_data.append(eval_low_im)
 
+    if args.decom == 1:
+        tr_phase = "Decom"
+    else:
+        tr_phase = "Relight"
+
     lowlight_enhance.train(
         train_low_data,
         train_low_data_eq, 
@@ -89,7 +94,7 @@ def lowlight_train(lowlight_enhance, args):
         eval_dir=args.eval_result_dir, 
         ckpt_dir=args.model_ckpt_dir, 
         eval_every_epoch=args.eval_every_epoch, 
-        train_phase="Decom",
+        train_phase=tr_phase,
         plot_every_epoch=args.plot_every_epoch
     )
 
@@ -169,7 +174,7 @@ if __name__ == '__main__':
     args.use_gpu = 1
     args.gpu_idx = '0'
     args.gpu_mem = float(0.8)
-    args.decom = 1
+    args.decom = 0
 
     # Data related args
     args.mat_key = 'data'
@@ -181,17 +186,17 @@ if __name__ == '__main__':
     args.normalization = 'global_normalization'
 
     # Directories
-    args.model_ckpt_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor_recon'
+    args.model_ckpt_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor_relight'
     args.train_data = '../PairLIE/data/hsi_dataset_indoor_only/train'
     args.eval_data = '../PairLIE/data/hsi_dataset_indoor_only/eval'
-    args.test_data = '../PairLIE/data/hsi_dataset/test'
+    args.test_data = '../PairLIE/data/hsi_dataset_indoor_only/test'
     
-    args.eval_result_dir = 'D:/sslie/eval_results_global_norm_max_1_74_divide_128p_indoor_recon'
+    args.eval_result_dir = 'D:/sslie/eval_results_global_norm_max_1_74_divide_128p_indoor_relight'
     args.test_result_dir = 'D:/sslie/test_results_20250120_124743/temp1'
     args.test_model_dir = './checkpoint/Decom_20250120_124743'
 
     # Train and Eval related args
-    args.phase = 'train'
+    args.phase = 'test'
     args.epoch = 1000
     args.batch_size = 1
     args.patch_size = 128
