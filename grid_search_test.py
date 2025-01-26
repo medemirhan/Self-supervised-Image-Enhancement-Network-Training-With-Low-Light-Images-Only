@@ -166,6 +166,13 @@ def main(args):
 if __name__ == '__main__':
     args = Struct()
 
+    globalMin = 0.0708354
+    globalMax = 1.7410845
+    lowLightMin = 0.0708354
+    lowLightMax = 0.2173913
+    normalLightMin = 0.0708354
+    normalLightMax = 1.7410845
+
     # Common args
     args.use_gpu = 1
     args.gpu_idx = '0'
@@ -178,23 +185,23 @@ if __name__ == '__main__':
     '''args.global_min = 0.
     args.global_max = 0.005019044472441'''
     args.global_min = 0.0708354
-    args.global_max = 0.2173913
+    args.global_max = 1.7410845
 
     # Directories
     args.model_ckpt_dir = './checkpoint'
     args.train_data = '../PairLIE/data/hsi_dataset/train'
     args.eval_data = '../PairLIE/data/hsi_dataset/eval'
-    args.test_data = '../PairLIE/data/hsi_dataset/test'
+    args.test_data = '../PairLIE/data/hsi_dataset_indoor_only/test'
     
     args.eval_result_dir = 'D:/sslie/eval_results'
-    args.test_result_dir = 'D:/sslie/test_results_20250115_005313'
-    args.test_model_dir = './checkpoint/Decom_20250115_005313'
+    args.test_result_dir = 'D:/sslie/test_results_global_norm_max_1_74_divide_128p_indoor_20250122_080320_1_74'
+    args.test_model_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor/Decom_20250122_080320'
 
     # Train and Eval related args
     args.phase = 'test'
     args.epoch = 600
     args.batch_size = 1
-    args.patch_size = 96
+    args.patch_size = 128
     args.start_lr = 1e-3
     args.lr_div_period = 100
     args.lr_div_factor = 3
@@ -202,12 +209,12 @@ if __name__ == '__main__':
     args.plot_every_epoch = 5
     
     #lums = np.concatenate((np.arange(0.01, 0.09, 0.03), np.arange(0.1, 3.1, 0.4), np.arange(4., 11., 2.)))
-    lums = np.concatenate((np.arange(0.01, 0.09, 0.03), np.arange(0.1, 3.1, 0.4)))
-    #lums = np.arange(0.11, 0.62, 0.1)
-    mins = (0.0708354, None)
-    args.post_scale = True
+    #lums = np.concatenate((np.arange(0.01, 0.09, 0.03), np.arange(0.1, 3.1, 0.4)))
+    lums = [0.2, 0.5, 0.9, 1.3, 1.7, 2.3, 2.8]
+    mins = [None]
+    args.post_scale = False
 
-    log_file_path = "lf_logs.log"
+    log_file_path = "lf_logs_global_norm_max_1_74_divide_128p_indoor_20250122_080320_1_74.log"
     label_dir = '../PairLIE/data/label_ll'
     test_result_dir = args.test_result_dir
     

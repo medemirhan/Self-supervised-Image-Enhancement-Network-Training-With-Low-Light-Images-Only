@@ -177,30 +177,30 @@ if __name__ == '__main__':
     '''args.global_min = 0.
     args.global_max = 0.005019044472441'''
     args.global_min = 0.0708354
-    args.global_max = 0.2173913
+    args.global_max = 1.7410845
     args.normalization = 'global_normalization'
 
     # Directories
-    args.model_ckpt_dir = './checkpoint'
-    args.train_data = '../PairLIE/data/hsi_dataset/train'
-    args.eval_data = '../PairLIE/data/hsi_dataset/eval'
+    args.model_ckpt_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor_recon'
+    args.train_data = '../PairLIE/data/hsi_dataset_indoor_only/train'
+    args.eval_data = '../PairLIE/data/hsi_dataset_indoor_only/eval'
     args.test_data = '../PairLIE/data/hsi_dataset/test'
     
-    args.eval_result_dir = 'D:/sslie/eval_results'
-    args.test_result_dir = 'D:/sslie/test_results_20250113_010110'
-    args.test_model_dir = './checkpoint/Decom_20250113_010110'
+    args.eval_result_dir = 'D:/sslie/eval_results_global_norm_max_1_74_divide_128p_indoor_recon'
+    args.test_result_dir = 'D:/sslie/test_results_20250120_124743/temp1'
+    args.test_model_dir = './checkpoint/Decom_20250120_124743'
 
     # Train and Eval related args
     args.phase = 'train'
-    args.epoch = 600
+    args.epoch = 1000
     args.batch_size = 1
-    args.patch_size = 96
+    args.patch_size = 128
     args.start_lr = 1e-3
     args.lr_div_period = 100
     args.lr_div_factor = 3
     args.eval_every_epoch = 100
     args.plot_every_epoch = 5
-    args.lum_factor = 24.5
+    args.lum_factor = 0.2
     args.post_scale = False
 
     main(args)

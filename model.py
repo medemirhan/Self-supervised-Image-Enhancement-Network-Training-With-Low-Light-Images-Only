@@ -61,7 +61,10 @@ class lowlight_enhance(object):
         self.DecomNet_layer_num = 5
         self.input_channels = input_channels  # Store channel count
         self.model_timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
-        
+
+        # Generate band-specific weights
+        #self.band_weights = self.generate_band_weights()
+
         # Store average losses per epoch
         self.epoch_losses = {
             'total_loss': [],
@@ -96,15 +99,24 @@ class lowlight_enhance(object):
 
         # Loss calculations
         self.recon_loss_low = tf.reduce_mean(tf.abs(R_low * I_low_expanded - self.input_high))
+        '''self.recon_loss_low = self.weighted_reconstruction_loss(
+            R_low * I_low_expanded, 
+            self.input_high
+        )'''
+        #self.recon_loss_low = tf.reduce_mean(tf.square(R_low * I_low_expanded - self.input_high))
+        #self.recon_loss_low = tf.reduce_mean(tf.abs(tf.math.pow(I_low_expanded, 0.2) * R_low - self.input_high))
         
         # Modified to handle multiple channels
         R_low_max = tf.reduce_max(R_low, axis=3, keepdims=True)
         self.recon_loss_low_eq = tf.reduce_mean(tf.abs(R_low_max - self.input_low_eq))
+        #self.recon_loss_low_eq = tf.reduce_mean(tf.square(R_low_max - self.input_low_eq))
         
         # Calculate smoothness loss using average across channels
         R_low_gray = tf.reduce_mean(R_low, axis=3, keepdims=True)
         self.R_low_loss_smooth = tf.reduce_mean(tf.abs(self.gradient(R_low_gray, "x")) + 
                                               tf.abs(self.gradient(R_low_gray, "y")))
+        '''self.R_low_loss_smooth = tf.reduce_mean(tf.square(self.gradient(R_low_gray, "x")) + 
+                                              tf.square(self.gradient(R_low_gray, "y")))'''
         
         self.Ismooth_loss_low = self.smooth(I_low, R_low_gray)
 
@@ -167,9 +179,7 @@ class lowlight_enhance(object):
         elif direction == "y":
             kernel = self.smooth_kernel_y
         return tf.abs(tf.nn.conv2d(input_tensor, kernel, strides=[1, 1, 1, 1], padding='SAME'))
-
-    def ave_gradient(self, input_tensor, direction):
-        return tf.layers.average_pooling2d(self.gradient(input_tensor, direction), pool_size=3, strides=1, padding='SAME')
+        #return tf.square(tf.nn.conv2d(input_tensor, kernel, strides=[1, 1, 1, 1], padding='SAME'))
 
     def smooth(self, input_I, input_R):
         return tf.reduce_mean(self.gradient(input_I, "x") * tf.exp(-10 * self.gradient(input_R, "x")) + 
@@ -431,9 +441,9 @@ class lowlight_enhance(object):
                 feed_dict={self.input_low: input_low_test}
             )
 
-            if data_min != None and data_max != None:
+            '''if data_min != None and data_max != None:
                 I_low = I_low * (data_max - data_min) + data_min
-                R_low = R_low * (data_max - data_min) + data_min
+                R_low = R_low * (data_max - data_min) + data_min'''
             enhanced_im = np.power(I_low, lum_factor) * R_low
 
             if(idx != 0):

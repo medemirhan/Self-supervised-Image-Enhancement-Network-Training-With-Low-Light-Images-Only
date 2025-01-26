@@ -54,7 +54,8 @@ def load_hsi(file, matContentHeader='ref', normalization=None, max_val=None, min
     else:
         raise NotImplementedError(normalization + ' is not implemented')
 
-    return x
+    return (x.astype("float32") / np.max(x))
+    #return x
 
 def per_channel_normalization(x):
     """

@@ -50,7 +50,7 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
         data_range = None
         if data_min != None and data_max != None:
             data_range = (data_min, data_max)
-            print("\n====> WARNING: Data will be clamped between data range values <====".format(avg_psnr))
+            print("====> WARNING: Data will be clamped between data range values <====".format(avg_psnr))
         elif data_max != None:
             data_range = data_max
 
@@ -77,20 +77,20 @@ if __name__ == '__main__':
     normalLightMin = 0.0708354
     normalLightMax = 1.7410845
 
-    '''globalMin = 0.
-    globalMax = 0.005019044472441'''
+    '''globalMin = lowLightMin
+    globalMax = lowLightMax'''
 
-    globalMin = 0.0708354
-    globalMax = 0.2173913
-
-    im_dir = 'D:/sslie/test_results_3rd/non_scaled/renamed/*.mat'
-    label_dir = '../PairLIE/data/label_ll'
+    '''im_dir = 'D:/sslie/test_results_3rd/post_scaled/renamed/*.mat'
+    label_dir = '../PairLIE/data/label_ll'''
 
     '''im_dir = 'D:/sslie/test_results_2nd/non_scaled/renamed/*.mat'
     label_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/gt'''
 
     '''im_dir = 'D:/sslie/test_results_20250112_165938/*.mat'
     label_dir = '../PairLIE/data/label_ll'''
+
+    im_dir = 'D:/sslie/test_results_20250120_124743/temp1/*.mat'
+    label_dir = '../PairLIE/data/label_ll'
 
     avg_psnr, avg_ssim, avg_sam = calc_metrics(
         im_dir=os.path.normpath(im_dir),
