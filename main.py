@@ -181,12 +181,12 @@ if __name__ == '__main__':
     args.normalization = 'global_normalization'
 
     # Directories
-    args.model_ckpt_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor_recon'
+    args.model_ckpt_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor_fft3'
     args.train_data = '../PairLIE/data/hsi_dataset_indoor_only/train'
     args.eval_data = '../PairLIE/data/hsi_dataset_indoor_only/eval'
     args.test_data = '../PairLIE/data/hsi_dataset/test'
     
-    args.eval_result_dir = 'D:/sslie/eval_results_global_norm_max_1_74_divide_128p_indoor_recon'
+    args.eval_result_dir = 'D:/sslie/eval_results_global_norm_max_1_74_divide_128p_indoor_fft3'
     args.test_result_dir = 'D:/sslie/test_results_20250120_124743/temp1'
     args.test_model_dir = './checkpoint/Decom_20250120_124743'
 
@@ -200,7 +200,7 @@ if __name__ == '__main__':
     args.lr_div_factor = 3
     args.eval_every_epoch = 100
     args.plot_every_epoch = 5
-    args.lum_factor = 0.2
+    args.lum_factor = 7.0
     args.post_scale = False
 
     main(args)

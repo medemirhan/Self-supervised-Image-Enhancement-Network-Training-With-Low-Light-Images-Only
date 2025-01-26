@@ -194,8 +194,8 @@ if __name__ == '__main__':
     args.test_data = '../PairLIE/data/hsi_dataset_indoor_only/test'
     
     args.eval_result_dir = 'D:/sslie/eval_results'
-    args.test_result_dir = 'D:/sslie/test_results_global_norm_max_1_74_divide_128p_indoor_20250122_080320_1_74'
-    args.test_model_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor/Decom_20250122_080320'
+    args.test_result_dir = 'D:/sslie/test_results_global_norm_max_1_74_divide_128p_indoor_fft3_20250126_235036_1_74'
+    args.test_model_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor/Decom_20250126_235036'
 
     # Train and Eval related args
     args.phase = 'test'
@@ -210,11 +210,11 @@ if __name__ == '__main__':
     
     #lums = np.concatenate((np.arange(0.01, 0.09, 0.03), np.arange(0.1, 3.1, 0.4), np.arange(4., 11., 2.)))
     #lums = np.concatenate((np.arange(0.01, 0.09, 0.03), np.arange(0.1, 3.1, 0.4)))
-    lums = [0.2, 0.5, 0.9, 1.3, 1.7, 2.3, 2.8]
+    lums = [0.2, 0.5, 0.9, 1.3, 1.7, 2.3, 2.8, 7.0]
     mins = [None]
     args.post_scale = False
 
-    log_file_path = "lf_logs_global_norm_max_1_74_divide_128p_indoor_20250122_080320_1_74.log"
+    log_file_path = "lf_logs_global_norm_max_1_74_divide_128p_indoor_fft3_20250126_235036_1_74.log"
     label_dir = '../PairLIE/data/label_ll'
     test_result_dir = args.test_result_dir
     

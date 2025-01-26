@@ -18,6 +18,32 @@ np.random.seed(seed_value)
 def concat(layers):
     return tf.concat(layers, axis=3)
 
+def FFTBlock(input_tensor, kernel_size=3, name="FFTBlock"):
+    with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
+        # Perform 2D FFT
+        fft = tf.signal.fft2d(tf.cast(input_tensor, tf.complex64))
+        magnitude = tf.abs(fft)  # Magnitude
+        phase = tf.angle(fft)    # Phase
+        
+        # Normalize the magnitude
+        magnitude_norm = magnitude / (tf.reduce_max(magnitude, axis=[1, 2], keepdims=True) + 1e-8)
+        
+        # Learnable transformation on the magnitude
+        magnitude_transformed = tf.layers.conv2d(
+            tf.expand_dims(magnitude_norm, -1), 
+            filters=1, kernel_size=kernel_size, 
+            padding='same', activation=tf.nn.relu, name="magnitude_conv")
+        magnitude_transformed = tf.squeeze(magnitude_transformed, axis=-1)
+        
+        # Reconstruct FFT with modified magnitude
+        real = magnitude_transformed * tf.cos(phase)
+        imag = magnitude_transformed * tf.sin(phase)
+        fft_modified = tf.complex(real, imag)
+        
+        # Inverse FFT
+        ifft = tf.signal.ifft2d(fft_modified)
+        return tf.abs(ifft)  # Return real part of IFFT
+
 def DecomNet(input_im, layer_num, channel=64, kernel_size=3, is_training=True):
     # Get static number of input channels
     input_shape = input_im.get_shape().as_list()
@@ -35,9 +61,13 @@ def DecomNet(input_im, layer_num, channel=64, kernel_size=3, is_training=True):
         conv_0 = tf.layers.conv2d(input_concat, channel//2, kernel_size, padding='same', activation=tf.nn.relu, name="first_layer")
         conv = tf.layers.conv2d(input_concat, channel, kernel_size * 3, padding='same', activation=None, name="shallow_feature_extraction")
         
-        conv1 = tf.layers.conv2d(conv, channel, kernel_size, padding='same', activation=tf.nn.relu, name='activated_layer_1')
-        conv2 = tf.layers.conv2d(conv1, channel*2, kernel_size, strides=2, padding='same', activation=tf.nn.relu, name='activated_layer_2')
-        conv3 = tf.layers.conv2d(conv2, channel*2, kernel_size, padding='same', activation=tf.nn.relu, name='activated_layer_3')
+        # FFT Block
+        fft_features = FFTBlock(conv, kernel_size, name="FFT_Module")
+        conv1 = tf.layers.conv2d(fft_features, channel, kernel_size, padding='same', activation=tf.nn.relu, name='activated_layer_1')
+
+        # Rest of the U-Net structure
+        conv2 = tf.layers.conv2d(conv1, channel * 2, kernel_size, strides=2, padding='same', activation=tf.nn.relu, name='activated_layer_2')
+        conv3 = tf.layers.conv2d(conv2, channel * 2, kernel_size, padding='same', activation=tf.nn.relu, name='activated_layer_3')
         conv4 = tf.layers.conv2d_transpose(conv3, channel, kernel_size, strides=2, padding='same', activation=tf.nn.relu, name='activated_layer_4')
         
         conv4_ba2 = concat([conv4, conv1])
@@ -71,7 +101,8 @@ class lowlight_enhance(object):
             'recon_loss': [],
             'recon_loss_eq': [],
             'R_smooth_loss': [],
-            'I_smooth_loss': []
+            'I_smooth_loss': [],
+            'freq_loss': []
         }
         # For accumulating losses within each epoch
         self.current_epoch_losses = {
@@ -80,6 +111,7 @@ class lowlight_enhance(object):
             'recon_loss_eq': 0,
             'R_smooth_loss': 0,
             'I_smooth_loss': 0,
+            'freq_loss': 0,
             'steps': 0
         }
 
@@ -106,6 +138,11 @@ class lowlight_enhance(object):
         #self.recon_loss_low = tf.reduce_mean(tf.square(R_low * I_low_expanded - self.input_high))
         #self.recon_loss_low = tf.reduce_mean(tf.abs(tf.math.pow(I_low_expanded, 0.2) * R_low - self.input_high))
         
+        # Frequency Loss
+        fft_input = tf.signal.fft2d(tf.cast(self.input_high, tf.complex64))
+        fft_recon = tf.signal.fft2d(tf.cast(R_low * I_low_expanded, tf.complex64))
+        self.freq_loss = tf.reduce_mean(tf.abs(tf.abs(fft_input) - tf.abs(fft_recon)))
+
         # Modified to handle multiple channels
         R_low_max = tf.reduce_max(R_low, axis=3, keepdims=True)
         self.recon_loss_low_eq = tf.reduce_mean(tf.abs(R_low_max - self.input_low_eq))
@@ -120,10 +157,11 @@ class lowlight_enhance(object):
         
         self.Ismooth_loss_low = self.smooth(I_low, R_low_gray)
 
-        self.loss_Decom_zhangyu = (self.recon_loss_low + 
-                                  0.1 * self.Ismooth_loss_low + 
+        self.loss_Decom_zhangyu = (1 * self.recon_loss_low + 
+                                  1 * self.Ismooth_loss_low + 
                                   0.1 * self.recon_loss_low_eq + 
-                                  0.01 * self.R_low_loss_smooth)
+                                  1 * self.R_low_loss_smooth +
+                                  0.05 * self.freq_loss)
 
         self.lr = tf.placeholder(tf.float32, name='learning_rate')
         optimizer = tf.train.AdamOptimizer(self.lr, name='AdamOptimizer')
@@ -250,6 +288,14 @@ class lowlight_enhance(object):
         plt.grid(True)
         plt.legend()
         
+        plt.subplot(2, 3, 6)
+        plt.plot(epochs, self.epoch_losses['freq_loss'], 'c-', label='Freq Loss')
+        plt.title('Freq Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+
         plt.tight_layout()
         
         # Create directory if it doesn't exist
@@ -330,9 +376,9 @@ class lowlight_enhance(object):
 
                 # train
                 if not boolflag:
-                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss = self.sess.run(
+                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, frequency_loss = self.sess.run(
                         [train_op, train_loss, self.recon_loss_low, self.recon_loss_low_eq, 
-                         self.R_low_loss_smooth, self.Ismooth_loss_low], 
+                         self.R_low_loss_smooth, self.Ismooth_loss_low, self.freq_loss], 
                         feed_dict={
                             self.input_low: batch_input_low,
                             self.input_high: batch_input_high,
@@ -342,9 +388,9 @@ class lowlight_enhance(object):
                     )
                 else:
                     boolflag = False
-                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss = self.sess.run(
+                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, frequency_loss = self.sess.run(
                         [train_op, train_loss, self.recon_loss_low, self.recon_loss_low_eq, 
-                         self.R_low_loss_smooth, self.Ismooth_loss_low],
+                         self.R_low_loss_smooth, self.Ismooth_loss_low, self.freq_loss],
                         feed_dict={
                             self.input_low: batch_input_low,
                             self.input_high: batch_input_high,
@@ -359,12 +405,13 @@ class lowlight_enhance(object):
                 self.current_epoch_losses['recon_loss_eq'] += recon_loss_eq
                 self.current_epoch_losses['R_smooth_loss'] += r_smooth_loss
                 self.current_epoch_losses['I_smooth_loss'] += i_smooth_loss
+                self.current_epoch_losses['freq_loss'] += frequency_loss
                 self.current_epoch_losses['steps'] += 1
 
                 print("%s Epoch: [%2d] [%4d/%4d] time: %4.4f, total_loss: %.6f" % 
                       (train_phase, epoch + 1, batch_id + 1, numBatch, time.time() - start_time, batch_loss))
-                print("Losses - Recon: %.6f, ReconEq: %.6f, RSmooth: %.6f, ISmooth: %.6f" %
-                      (recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss))
+                print("Losses - Recon: %.6f, ReconEq: %.6f, RSmooth: %.6f, ISmooth: %.6f, Freq: %.6f" %
+                      (recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, frequency_loss))
                 iter_num += 1
 
             # At the end of each epoch, compute average losses
@@ -375,6 +422,7 @@ class lowlight_enhance(object):
                 self.epoch_losses['recon_loss_eq'].append(self.current_epoch_losses['recon_loss_eq'] / steps)
                 self.epoch_losses['R_smooth_loss'].append(self.current_epoch_losses['R_smooth_loss'] / steps)
                 self.epoch_losses['I_smooth_loss'].append(self.current_epoch_losses['I_smooth_loss'] / steps)
+                self.epoch_losses['freq_loss'].append(self.current_epoch_losses['freq_loss'] / steps)
 
             # Reset current epoch losses
             for key in self.current_epoch_losses:
@@ -455,7 +503,7 @@ class lowlight_enhance(object):
                 #save_hsi(os.path.join(save_dir, name + "_enhanced." + suffix), enhanced_im)
                 save_hsi(os.path.join(save_dir, name + "." + suffix), enhanced_im)
 
-        ave_run_time = total_run_time / (float(len(test_low_data))-1)
+        ave_run_time = total_run_time / (float(len(test_low_data) + 1)-1)
         print("[*] Average run time: %.4f" % ave_run_time)
 
     def print_band_weights(self):
