@@ -186,17 +186,17 @@ if __name__ == '__main__':
     args.normalization = 'global_normalization'
 
     # Directories
-    args.model_ckpt_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor_relight'
+    args.model_ckpt_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor_comb'
     args.train_data = '../PairLIE/data/hsi_dataset_indoor_only/train'
     args.eval_data = '../PairLIE/data/hsi_dataset_indoor_only/eval'
     args.test_data = '../PairLIE/data/hsi_dataset_indoor_only/test'
     
-    args.eval_result_dir = 'D:/sslie/eval_results_global_norm_max_1_74_divide_128p_indoor_relight'
+    args.eval_result_dir = 'D:/sslie/eval_results_global_norm_max_1_74_divide_128p_indoor_comb'
     args.test_result_dir = 'D:/sslie/test_results_20250120_124743/temp1'
     args.test_model_dir = './checkpoint/Decom_20250120_124743'
 
     # Train and Eval related args
-    args.phase = 'test'
+    args.phase = 'train'
     args.epoch = 1000
     args.batch_size = 1
     args.patch_size = 128

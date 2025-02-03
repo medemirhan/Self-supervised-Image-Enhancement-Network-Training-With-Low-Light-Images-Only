@@ -109,7 +109,9 @@ class lowlight_enhance(object):
             'R_smooth_loss': [],
             'I_smooth_loss': [],
             'I_smooth_loss_delta': [],
-            'relight_loss': []
+            'relight_loss': [],
+            'decom_zhangyu': [],
+            'relightNet_loss': []
         }
         # For accumulating losses within each epoch
         self.current_epoch_losses = {
@@ -120,6 +122,8 @@ class lowlight_enhance(object):
             'I_smooth_loss': 0,
             'I_smooth_loss_delta': 0,
             'relight_loss': 0,
+            'decom_zhangyu': 0,
+            'relightNet_loss': 0,
             'steps': 0
         }
 
@@ -173,6 +177,8 @@ class lowlight_enhance(object):
         self.relight_loss = tf.reduce_mean(tf.abs(R_low * I_delta_expanded - self.input_high))
         self.loss_Relight = (1 * self.relight_loss + 
                              3 * self.Ismooth_loss_delta)
+        
+        self.loss_combined = self.loss_Decom_zhangyu + self.loss_Relight
 
         self.lr = tf.placeholder(tf.float32, name='learning_rate')
         optimizer = tf.train.AdamOptimizer(self.lr, name='AdamOptimizer')
@@ -183,9 +189,13 @@ class lowlight_enhance(object):
         self.var_Relight = [var for var in tf.trainable_variables() if 'RelightNet' in var.name]
         self.train_op_Relight = optimizer.minimize(self.loss_Relight, var_list = self.var_Relight)
 
+        self.var_Combined = [var for var in tf.trainable_variables() if 'DecomNet' or 'RelightNet' in var.name]
+        self.train_op_Combined = optimizer.minimize(self.loss_combined, var_list=self.var_Combined)
+
         self.sess.run(tf.global_variables_initializer())
         self.saver_Decom = tf.train.Saver(var_list=self.var_Decom)
         self.saver_Relight = tf.train.Saver(var_list=self.var_Relight)
+        self.saver_Combined = tf.train.Saver(var_list=self.var_Combined)
         print("[*] Initialize model successfully...")
 
         #self.print_band_weights()
@@ -259,8 +269,8 @@ class lowlight_enhance(object):
             result_2 = result_2 * (0.2173913 - 0.0708354) + 0.0708354'''
             
             mat_path = os.path.join(sample_dir, 'eval_%s_%d_%d.png' % (train_phase, idx + 1, epoch_num))
-            save_hsi(mat_path, result_1, postfix='_R')
-            save_hsi(mat_path, result_2, postfix='_I')
+            #save_hsi(mat_path, result_1, postfix='_R')
+            #save_hsi(mat_path, result_2, postfix='_I')
 
     def train(self, train_low_data, train_low_data_eq, eval_low_data, train_high_data, batch_size, patch_size, epoch, lr, eval_dir, ckpt_dir, eval_every_epoch, train_phase, plot_every_epoch=10):
         """
@@ -274,14 +284,18 @@ class lowlight_enhance(object):
         numBatch = len(train_low_data) // int(batch_size)
 
         # load pretrained model
-        if train_phase == "Decom":
+        '''if train_phase == "Decom":
             train_op = self.train_op_Decom
             train_loss = self.loss_Decom_zhangyu
             saver = self.saver_Decom
         elif train_phase == "Relight":
             train_op = self.train_op_Relight
             train_loss = self.loss_Relight
-            saver = self.saver_Relight
+            saver = self.saver_Relight'''
+        
+        train_op = self.train_op_Combined
+        train_loss = self.loss_combined
+        saver = self.saver_Combined
 
         load_model_status, global_step = self.load(saver, ckpt_dir)
         if load_model_status:
@@ -337,56 +351,36 @@ class lowlight_enhance(object):
 
                 # train
                 if not boolflag:
-                    if train_phase == "Decom":
-                        _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss = self.sess.run(
-                            [train_op, train_loss, self.recon_loss_low, self.recon_loss_low_eq, 
-                            self.R_low_loss_smooth, self.Ismooth_loss_low], 
-                            feed_dict={
-                                self.input_low: batch_input_low,
-                                self.input_high: batch_input_high,
-                                self.input_low_eq: batch_input_low_eq,
-                                self.lr: lr[epoch]
-                            }
-                        )
-                    elif train_phase == "Relight":
-                        _, batch_loss, i_smooth_loss_delta, relight_loss = self.sess.run(
-                            [train_op, train_loss, self.Ismooth_loss_delta, self.relight_loss], 
-                            feed_dict={
-                                self.input_low: batch_input_low,
-                                self.input_high: batch_input_high,
-                                self.input_low_eq: batch_input_low_eq,
-                                self.lr: lr[epoch]
-                            }
-                        )
+                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, i_smooth_loss_delta, relight_loss, decom_loss, relightNet_loss = self.sess.run(
+                        [train_op, train_loss, self.recon_loss_low, self.recon_loss_low_eq, 
+                        self.R_low_loss_smooth, self.Ismooth_loss_low, self.Ismooth_loss_delta, self.relight_loss,
+                        self.loss_Decom_zhangyu, self.loss_Relight], 
+                        feed_dict={
+                            self.input_low: batch_input_low,
+                            self.input_high: batch_input_high,
+                            self.input_low_eq: batch_input_low_eq,
+                            self.lr: lr[epoch]
+                        }
+                    )
                 else:
                     boolflag = False
-                    if train_phase == "Decom":
-                        _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss = self.sess.run(
-                            [train_op, train_loss, self.recon_loss_low, self.recon_loss_low_eq, 
-                            self.R_low_loss_smooth, self.Ismooth_loss_low],
-                            feed_dict={
-                                self.input_low: batch_input_low,
-                                self.input_high: batch_input_high,
-                                self.input_low_eq: batch_input_low_eq,
-                                self.lr: lr[epoch]
-                            }
-                        )
-                    elif train_phase == "Relight":
-                        _, batch_loss, i_smooth_loss_delta, relight_loss = self.sess.run(
-                            [train_op, train_loss, self.Ismooth_loss_delta, self.relight_loss], 
-                            feed_dict={
-                                self.input_low: batch_input_low,
-                                self.input_high: batch_input_high,
-                                self.input_low_eq: batch_input_low_eq,
-                                self.lr: lr[epoch]
-                            }
-                        )
+                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, i_smooth_loss_delta, relight_loss, decom_loss, relightNet_loss = self.sess.run(
+                        [train_op, train_loss, self.recon_loss_low, self.recon_loss_low_eq, 
+                        self.R_low_loss_smooth, self.Ismooth_loss_low, self.Ismooth_loss_delta, self.relight_loss,
+                        self.loss_Decom_zhangyu, self.loss_Relight], 
+                        feed_dict={
+                            self.input_low: batch_input_low,
+                            self.input_high: batch_input_high,
+                            self.input_low_eq: batch_input_low_eq,
+                            self.lr: lr[epoch]
+                        }
+                    )
 
                 print("%s Epoch: [%2d] [%4d/%4d] time: %4.4f, total_loss: %.6f" % 
                       (train_phase, epoch + 1, batch_id + 1, numBatch, time.time() - start_time, batch_loss))
 
                 # Accumulate losses for averaging
-                if train_phase == "Decom":
+                '''if train_phase == "Decom":
                     self.current_epoch_losses['total_loss'] += batch_loss
                     self.current_epoch_losses['recon_loss'] += recon_loss
                     self.current_epoch_losses['recon_loss_eq'] += recon_loss_eq
@@ -401,14 +395,27 @@ class lowlight_enhance(object):
                     self.current_epoch_losses['relight_loss'] += relight_loss
                     self.current_epoch_losses['steps'] += 1
                     print("Losses - ISmoothDelta: %.6f, Relight: %.6f" %
-                        (i_smooth_loss_delta, relight_loss))
+                        (i_smooth_loss_delta, relight_loss))'''
 
+                self.current_epoch_losses['total_loss'] += batch_loss
+                self.current_epoch_losses['recon_loss'] += recon_loss
+                self.current_epoch_losses['recon_loss_eq'] += recon_loss_eq
+                self.current_epoch_losses['R_smooth_loss'] += r_smooth_loss
+                self.current_epoch_losses['I_smooth_loss'] += i_smooth_loss
+                self.current_epoch_losses['I_smooth_loss_delta'] += i_smooth_loss_delta
+                self.current_epoch_losses['relight_loss'] += relight_loss
+                self.current_epoch_losses['decom_zhangyu'] += decom_loss
+                self.current_epoch_losses['relightNet_loss'] += relightNet_loss
+                self.current_epoch_losses['steps'] += 1
+                print("Losses - Recon: %.6f, ReconEq: %.6f, RSmooth: %.6f, ISmooth: %.6f, ISmoothDelta: %.6f, Relight: %.6f, Decom: %.6f, RelNet: %.6f" %
+                    (recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, i_smooth_loss_delta, relight_loss, decom_loss, relightNet_loss))
+            
                 iter_num += 1
 
             # At the end of each epoch, compute average losses
             steps = self.current_epoch_losses['steps']
             if steps > 0:  # Ensure we don't divide by zero
-                if train_phase == "Decom":
+                '''if train_phase == "Decom":
                     self.epoch_losses['total_loss'].append(self.current_epoch_losses['total_loss'] / steps)
                     self.epoch_losses['recon_loss'].append(self.current_epoch_losses['recon_loss'] / steps)
                     self.epoch_losses['recon_loss_eq'].append(self.current_epoch_losses['recon_loss_eq'] / steps)
@@ -417,7 +424,16 @@ class lowlight_enhance(object):
                 elif train_phase == "Relight":
                     self.epoch_losses['total_loss'].append(self.current_epoch_losses['total_loss'] / steps)
                     self.epoch_losses['I_smooth_loss_delta'].append(self.current_epoch_losses['I_smooth_loss_delta'] / steps)
-                    self.epoch_losses['relight_loss'].append(self.current_epoch_losses['relight_loss'] / steps)
+                    self.epoch_losses['relight_loss'].append(self.current_epoch_losses['relight_loss'] / steps)'''
+                self.epoch_losses['total_loss'].append(self.current_epoch_losses['total_loss'] / steps)
+                self.epoch_losses['recon_loss'].append(self.current_epoch_losses['recon_loss'] / steps)
+                self.epoch_losses['recon_loss_eq'].append(self.current_epoch_losses['recon_loss_eq'] / steps)
+                self.epoch_losses['R_smooth_loss'].append(self.current_epoch_losses['R_smooth_loss'] / steps)
+                self.epoch_losses['I_smooth_loss'].append(self.current_epoch_losses['I_smooth_loss'] / steps)
+                self.epoch_losses['I_smooth_loss_delta'].append(self.current_epoch_losses['I_smooth_loss_delta'] / steps)
+                self.epoch_losses['relight_loss'].append(self.current_epoch_losses['relight_loss'] / steps)
+                self.epoch_losses['decom_zhangyu'].append(self.current_epoch_losses['decom_zhangyu'] / steps)
+                self.epoch_losses['relightNet_loss'].append(self.current_epoch_losses['relightNet_loss'] / steps)
 
             # Reset current epoch losses
             for key in self.current_epoch_losses:
@@ -426,17 +442,19 @@ class lowlight_enhance(object):
             # Plot losses every plot_every_epoch epochs
             if plot_every_epoch > 0 and (epoch + 1) % plot_every_epoch == 0:
                 print(f"\nPlotting loss curves at epoch {epoch + 1}")
-                if train_phase == "Decom":
+                '''if train_phase == "Decom":
                     loss_plot_path = os.path.join(eval_dir, 'loss_curves_decom.png')
                     self.plot_loss_curve_decom(loss_plot_path)
                 elif train_phase == "Relight":
                     loss_plot_path = os.path.join(eval_dir, 'loss_curves_relight.png')
-                    self.plot_loss_curve_relight(loss_plot_path)
+                    self.plot_loss_curve_relight(loss_plot_path)'''
+                loss_plot_path = os.path.join(eval_dir, 'loss_curves_combined.png')
+                self.plot_loss_curve_combined(loss_plot_path)
 
             # evaluate the model and save a checkpoint file for it
             if (epoch + 1) % eval_every_epoch == 0:
-                self.evaluate(epoch + 1, eval_low_data, sample_dir=eval_dir, train_phase=train_phase)
-                self.save(saver, iter_num, ckpt_dir, "RetinexNet-%s" % train_phase)
+                self.evaluate(epoch + 1, eval_low_data, sample_dir=eval_dir, train_phase='Combined')
+                self.save(saver, iter_num, ckpt_dir, "RetinexNet-%s" % 'Combined')
 
         print("[*] Finish training for phase %s." % train_phase)
 
@@ -471,13 +489,19 @@ class lowlight_enhance(object):
 
         load_model_status_Decom = False
         load_model_status_Relight = False
+        load_model_status_Combined = False
         
-        if decom_flag == 1:
+        '''if decom_flag == 1:
             load_model_status_Decom, _ = self.load(self.saver_Decom, model_dir_decom)
         else:
-            load_model_status_Relight, _ = self.load(self.saver_Relight, model_dir_decom)
+            load_model_status_Relight, _ = self.load(self.saver_Relight, model_dir_decom)'''
         
-        if load_model_status_Decom or load_model_status_Relight:
+        load_model_status_Combined, _ = self.load(self.saver_Combined, model_dir_decom)
+        
+        '''if load_model_status_Decom or load_model_status_Relight:
+            print("[*] Load weights successfully...")'''
+        
+        if load_model_status_Combined:
             print("[*] Load weights successfully...")
         
         print("[*] Testing...")
@@ -492,7 +516,7 @@ class lowlight_enhance(object):
 
             start_time = time.time()
 
-            if decom_flag == 1:
+            '''if decom_flag == 1:
                 R_low, I_low, output_S_low_zy = self.sess.run(
                     [self.output_R_low, self.output_I_low, self.output_S_low_zy], 
                     feed_dict={self.input_low: input_low_test}
@@ -500,7 +524,12 @@ class lowlight_enhance(object):
             else:
                 [I_delta, S] = self.sess.run(
                     [self.output_I_delta, self.output_S],
-                    feed_dict = {self.input_low: input_low_test})
+                    feed_dict = {self.input_low: input_low_test})'''
+            
+            R_low, I_low, output_S_low_zy, I_delta, S = self.sess.run(
+                [self.output_R_low, self.output_I_low, self.output_S_low_zy, self.output_I_delta, self.output_S], 
+                feed_dict={self.input_low: input_low_test}
+            )
 
             '''if data_min != None and data_max != None:
                 I_low = I_low * (data_max - data_min) + data_min
@@ -606,6 +635,95 @@ class lowlight_enhance(object):
         plt.subplot(1, 3, 3)
         plt.plot(epochs, self.epoch_losses['relight_loss'], 'b-', label='Relightness Loss')
         plt.title('Relightness Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+        
+        plt.tight_layout()
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        
+        plt.savefig(save_path)
+        plt.close()
+        print(f"Loss curves saved to {save_path}")
+
+    def plot_loss_curve_combined(self, save_path='loss_curve.png'):
+        """Plot and save all training loss curves with epoch numbers"""
+        
+        epochs = range(1, len(self.epoch_losses['total_loss']) + 1)
+        
+        plt.figure(figsize=(15, 10))
+        
+        # Plot each loss in a separate subplot
+        plt.subplot(3, 3, 1)
+        plt.plot(epochs, self.epoch_losses['total_loss'], 'k-', label='Total Loss')
+        plt.title('Total Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+        
+        plt.subplot(3, 3, 2)
+        plt.plot(epochs, self.epoch_losses['recon_loss'], 'r-', label='Reconstruction Loss')
+        plt.title('Reconstruction Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+        
+        plt.subplot(3, 3, 3)
+        plt.plot(epochs, self.epoch_losses['recon_loss_eq'], 'b-', label='Eq Reconstruction Loss')
+        plt.title('Equalization Reconstruction Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+        
+        plt.subplot(3, 3, 4)
+        plt.plot(epochs, self.epoch_losses['R_smooth_loss'], 'g-', label='R Smoothness Loss')
+        plt.title('R Smoothness Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+        
+        plt.subplot(3, 3, 5)
+        plt.plot(epochs, self.epoch_losses['I_smooth_loss'], 'm-', label='I Smoothness Loss')
+        plt.title('I Smoothness Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+
+        plt.subplot(3, 3, 6)
+        plt.plot(epochs, self.epoch_losses['I_smooth_loss_delta'], 'r-', label='I Smoothness Delta Loss')
+        plt.title('I Smoothness Delta Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+        
+        plt.subplot(3, 3, 7)
+        plt.plot(epochs, self.epoch_losses['relight_loss'], 'c-', label='Relightness Loss')
+        plt.title('Relightness Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+
+        plt.subplot(3, 3, 8)
+        plt.plot(epochs, self.epoch_losses['decom_zhangyu'], 'y-', label='Decom Loss')
+        plt.title('Decom Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+
+        plt.subplot(3, 3, 9)
+        plt.plot(epochs, self.epoch_losses['relightNet_loss'], 'g-', label='RelightNet Loss')
+        plt.title('RelightNet Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
