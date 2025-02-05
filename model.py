@@ -110,6 +110,7 @@ class lowlight_enhance(object):
             'I_smooth_loss': [],
             'I_smooth_loss_delta': [],
             'relight_loss': [],
+            'fourier_loss': [],
             'decom_zhangyu': [],
             'relightNet_loss': []
         }
@@ -122,6 +123,7 @@ class lowlight_enhance(object):
             'I_smooth_loss': 0,
             'I_smooth_loss_delta': 0,
             'relight_loss': 0,
+            'fourier_loss': 0,
             'decom_zhangyu': 0,
             'relightNet_loss': 0,
             'steps': 0
@@ -144,6 +146,7 @@ class lowlight_enhance(object):
         self.output_S_low_zy = R_low * I_low_expanded  # H×W×64
         self.output_I_delta = I_delta_expanded  # H×W×64
         self.output_S = R_low * I_delta_expanded  # H×W×64 * H×W×64 -> H×W×64
+        self.output_S = self.output_S + R_low * I_low_expanded
 
         # Loss calculations
         self.recon_loss_low = tf.reduce_mean(tf.abs(R_low * I_low_expanded - self.input_high))
@@ -169,16 +172,21 @@ class lowlight_enhance(object):
         self.Ismooth_loss_low = self.smooth(I_low, R_low_gray)
 
         self.loss_Decom_zhangyu = (self.recon_loss_low + 
-                                  0.1 * self.Ismooth_loss_low + 
-                                  0.1 * self.recon_loss_low_eq + 
-                                  0.01 * self.R_low_loss_smooth)
+                                  1 * self.Ismooth_loss_low + 
+                                  0 * self.recon_loss_low_eq + 
+                                  1 * self.R_low_loss_smooth)
 
         self.Ismooth_loss_delta = self.smooth(I_delta, R_low)
         self.relight_loss = tf.reduce_mean(tf.abs(R_low * I_delta_expanded - self.input_high))
-        self.loss_Relight = (1 * self.relight_loss + 
-                             3 * self.Ismooth_loss_delta)
+        self.loss_Relight = (0.1 * self.relight_loss + 
+                             10 * self.Ismooth_loss_delta)
         
-        self.loss_combined = self.loss_Decom_zhangyu + self.loss_Relight
+        self.fourier_loss = self.fourier_spectrum_loss(self.input_low, self.output_S, cutoff=0.1, loss_type="l1")
+
+        #self.loss_combined = self.loss_Decom_zhangyu + self.loss_Relight
+        self.loss_combined = (1 * self.loss_Decom_zhangyu + 
+                              2 * self.loss_Relight + 
+                              0.2 * self.fourier_loss)
 
         self.lr = tf.placeholder(tf.float32, name='learning_rate')
         optimizer = tf.train.AdamOptimizer(self.lr, name='AdamOptimizer')
@@ -351,10 +359,10 @@ class lowlight_enhance(object):
 
                 # train
                 if not boolflag:
-                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, i_smooth_loss_delta, relight_loss, decom_loss, relightNet_loss = self.sess.run(
+                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, i_smooth_loss_delta, relight_loss, fourier_loss, decom_loss, relightNet_loss = self.sess.run(
                         [train_op, train_loss, self.recon_loss_low, self.recon_loss_low_eq, 
                         self.R_low_loss_smooth, self.Ismooth_loss_low, self.Ismooth_loss_delta, self.relight_loss,
-                        self.loss_Decom_zhangyu, self.loss_Relight], 
+                        self.fourier_loss, self.loss_Decom_zhangyu, self.loss_Relight], 
                         feed_dict={
                             self.input_low: batch_input_low,
                             self.input_high: batch_input_high,
@@ -364,10 +372,10 @@ class lowlight_enhance(object):
                     )
                 else:
                     boolflag = False
-                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, i_smooth_loss_delta, relight_loss, decom_loss, relightNet_loss = self.sess.run(
+                    _, batch_loss, recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, i_smooth_loss_delta, relight_loss, fourier_loss, decom_loss, relightNet_loss = self.sess.run(
                         [train_op, train_loss, self.recon_loss_low, self.recon_loss_low_eq, 
                         self.R_low_loss_smooth, self.Ismooth_loss_low, self.Ismooth_loss_delta, self.relight_loss,
-                        self.loss_Decom_zhangyu, self.loss_Relight], 
+                        self.fourier_loss, self.loss_Decom_zhangyu, self.loss_Relight], 
                         feed_dict={
                             self.input_low: batch_input_low,
                             self.input_high: batch_input_high,
@@ -404,11 +412,12 @@ class lowlight_enhance(object):
                 self.current_epoch_losses['I_smooth_loss'] += i_smooth_loss
                 self.current_epoch_losses['I_smooth_loss_delta'] += i_smooth_loss_delta
                 self.current_epoch_losses['relight_loss'] += relight_loss
+                self.current_epoch_losses['fourier_loss'] += fourier_loss
                 self.current_epoch_losses['decom_zhangyu'] += decom_loss
                 self.current_epoch_losses['relightNet_loss'] += relightNet_loss
                 self.current_epoch_losses['steps'] += 1
-                print("Losses - Recon: %.6f, ReconEq: %.6f, RSmooth: %.6f, ISmooth: %.6f, ISmoothDelta: %.6f, Relight: %.6f, Decom: %.6f, RelNet: %.6f" %
-                    (recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, i_smooth_loss_delta, relight_loss, decom_loss, relightNet_loss))
+                print("Losses - Recon: %.6f, ReconEq: %.6f, RSmooth: %.6f, ISmooth: %.6f, ISmoothDelta: %.6f, Relight: %.6f, Fourier: %.6f, Decom: %.6f, RelNet: %.6f" %
+                    (recon_loss, recon_loss_eq, r_smooth_loss, i_smooth_loss, i_smooth_loss_delta, relight_loss, fourier_loss, decom_loss, relightNet_loss))
             
                 iter_num += 1
 
@@ -432,6 +441,7 @@ class lowlight_enhance(object):
                 self.epoch_losses['I_smooth_loss'].append(self.current_epoch_losses['I_smooth_loss'] / steps)
                 self.epoch_losses['I_smooth_loss_delta'].append(self.current_epoch_losses['I_smooth_loss_delta'] / steps)
                 self.epoch_losses['relight_loss'].append(self.current_epoch_losses['relight_loss'] / steps)
+                self.epoch_losses['fourier_loss'].append(self.current_epoch_losses['fourier_loss'] / steps)
                 self.epoch_losses['decom_zhangyu'].append(self.current_epoch_losses['decom_zhangyu'] / steps)
                 self.epoch_losses['relightNet_loss'].append(self.current_epoch_losses['relightNet_loss'] / steps)
 
@@ -654,10 +664,10 @@ class lowlight_enhance(object):
         
         epochs = range(1, len(self.epoch_losses['total_loss']) + 1)
         
-        plt.figure(figsize=(15, 10))
+        plt.figure(figsize=(20, 10))
         
         # Plot each loss in a separate subplot
-        plt.subplot(3, 3, 1)
+        plt.subplot(3, 4, 1)
         plt.plot(epochs, self.epoch_losses['total_loss'], 'k-', label='Total Loss')
         plt.title('Total Loss')
         plt.xlabel('Epoch')
@@ -665,7 +675,7 @@ class lowlight_enhance(object):
         plt.grid(True)
         plt.legend()
         
-        plt.subplot(3, 3, 2)
+        plt.subplot(3, 4, 2)
         plt.plot(epochs, self.epoch_losses['recon_loss'], 'r-', label='Reconstruction Loss')
         plt.title('Reconstruction Loss')
         plt.xlabel('Epoch')
@@ -673,7 +683,7 @@ class lowlight_enhance(object):
         plt.grid(True)
         plt.legend()
         
-        plt.subplot(3, 3, 3)
+        plt.subplot(3, 4, 3)
         plt.plot(epochs, self.epoch_losses['recon_loss_eq'], 'b-', label='Eq Reconstruction Loss')
         plt.title('Equalization Reconstruction Loss')
         plt.xlabel('Epoch')
@@ -681,7 +691,7 @@ class lowlight_enhance(object):
         plt.grid(True)
         plt.legend()
         
-        plt.subplot(3, 3, 4)
+        plt.subplot(3, 4, 4)
         plt.plot(epochs, self.epoch_losses['R_smooth_loss'], 'g-', label='R Smoothness Loss')
         plt.title('R Smoothness Loss')
         plt.xlabel('Epoch')
@@ -689,7 +699,7 @@ class lowlight_enhance(object):
         plt.grid(True)
         plt.legend()
         
-        plt.subplot(3, 3, 5)
+        plt.subplot(3, 4, 5)
         plt.plot(epochs, self.epoch_losses['I_smooth_loss'], 'm-', label='I Smoothness Loss')
         plt.title('I Smoothness Loss')
         plt.xlabel('Epoch')
@@ -697,7 +707,7 @@ class lowlight_enhance(object):
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(3, 3, 6)
+        plt.subplot(3, 4, 6)
         plt.plot(epochs, self.epoch_losses['I_smooth_loss_delta'], 'r-', label='I Smoothness Delta Loss')
         plt.title('I Smoothness Delta Loss')
         plt.xlabel('Epoch')
@@ -705,7 +715,7 @@ class lowlight_enhance(object):
         plt.grid(True)
         plt.legend()
         
-        plt.subplot(3, 3, 7)
+        plt.subplot(3, 4, 7)
         plt.plot(epochs, self.epoch_losses['relight_loss'], 'c-', label='Relightness Loss')
         plt.title('Relightness Loss')
         plt.xlabel('Epoch')
@@ -713,7 +723,7 @@ class lowlight_enhance(object):
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(3, 3, 8)
+        plt.subplot(3, 4, 8)
         plt.plot(epochs, self.epoch_losses['decom_zhangyu'], 'y-', label='Decom Loss')
         plt.title('Decom Loss')
         plt.xlabel('Epoch')
@@ -721,14 +731,22 @@ class lowlight_enhance(object):
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(3, 3, 9)
+        plt.subplot(3, 4, 9)
         plt.plot(epochs, self.epoch_losses['relightNet_loss'], 'g-', label='RelightNet Loss')
         plt.title('RelightNet Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
         plt.legend()
-        
+
+        plt.subplot(3, 4, 10)
+        plt.plot(epochs, self.epoch_losses['fourier_loss'], 'm-', label='Fourier Loss')
+        plt.title('Fourier Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+
         plt.tight_layout()
         
         # Create directory if it doesn't exist
@@ -748,3 +766,101 @@ class lowlight_enhance(object):
         plt.xlabel('band #')
         plt.ylabel('weight')
         plt.grid(True)
+
+    def dynamic_meshgrid(self, y, x):
+        """
+        Create a meshgrid from dynamic 1D tensors y and x.
+        
+        Args:
+            y: Tensor of shape [H].
+            x: Tensor of shape [W].
+            
+        Returns:
+            Y: Tensor of shape [H, W] with rows equal to y.
+            X: Tensor of shape [H, W] with columns equal to x.
+        """
+        H = tf.shape(y)[0]
+        W = tf.shape(x)[0]
+        Y = tf.tile(tf.expand_dims(y, axis=1), [1, W])
+        X = tf.tile(tf.expand_dims(x, axis=0), [H, 1])
+        return Y, X
+
+    def high_pass_filter(self, fourier_image, cutoff=0.08):
+        """
+        Apply a high-pass filter in the frequency domain by zeroing out
+        the low-frequency components.
+        
+        Args:
+            fourier_image: A complex Tensor of shape (B, H, W, C).
+            cutoff: A float specifying the cutoff radius in normalized coordinates.
+                    Frequencies with a normalized radius < cutoff will be suppressed.
+                    
+        Returns:
+            A Tensor of the same shape as fourier_image with low frequencies zeroed out.
+        """
+        # Check if H and W are known statically.
+        static_shape = fourier_image.get_shape().as_list()
+        if static_shape[1] is not None and static_shape[2] is not None:
+            H, W = static_shape[1], static_shape[2]
+            # When dimensions are known, use tf.linspace and tf.meshgrid.
+            y = tf.linspace(-1.0, 1.0, H)  # shape: [H]
+            x = tf.linspace(-1.0, 1.0, W)  # shape: [W]
+            # Note: In TF 1.x, specifying the 'indexing' argument may or may not be supported.
+            # If you run into issues here, you can replace this branch with the dynamic version.
+            Y, X = tf.meshgrid(y, x, indexing='ij')
+        else:
+            # Fully dynamic branch.
+            shape = tf.shape(fourier_image)
+            H = shape[1]
+            W = shape[2]
+            # Create coordinate vectors using tf.range.
+            y = tf.cast(tf.range(H), tf.float32)  # shape: [H]
+            x = tf.cast(tf.range(W), tf.float32)  # shape: [W]
+            # Scale these to the interval [-1, 1].
+            y = 2.0 * (y / tf.cast(H - 1, tf.float32)) - 1.0
+            x = 2.0 * (x / tf.cast(W - 1, tf.float32)) - 1.0
+            # Build the meshgrid using our custom dynamic_meshgrid.
+            Y, X = self.dynamic_meshgrid(y, x)
+        
+        # Compute the Euclidean distance from the center (0,0).
+        radius = tf.sqrt(tf.square(X) + tf.square(Y))
+        
+        # Create a mask: 1 where radius >= cutoff, 0 elsewhere.
+        mask = tf.cast(radius >= cutoff, tf.complex64)
+        # Reshape mask to broadcast to shape (B, H, W, C).
+        mask = tf.reshape(mask, [1, tf.shape(fourier_image)[1], tf.shape(fourier_image)[2], 1])
+        
+        return fourier_image * mask
+
+    def fourier_spectrum_loss(self, input_hsi, target_hsi, cutoff=0.08, loss_type="l1"):
+        """
+        Compute the Fourier spectrum loss between two images.
+        
+        Args:
+            input_hsi: Low-light hyperspectral image, Tensor of shape (B, H, W, C), dtype tf.float32.
+            target_hsi: Enhanced hyperspectral image, Tensor of shape (B, H, W, C), dtype tf.float32.
+            cutoff: High-pass filter cutoff in normalized coordinates.
+            loss_type: "l1" for L1 loss or "l2" for L2 loss.
+        
+        Returns:
+            A scalar Tensor representing the Fourier spectrum loss.
+        """
+        # Convert images to complex and compute the 2D FFT.
+        fft_input = tf.spectral.fft2d(tf.complex(input_hsi, 0.0))
+        fft_target = tf.spectral.fft2d(tf.complex(target_hsi, 0.0))
+        
+        # Apply the high-pass filter to each FFT.
+        high_freq_input = self.high_pass_filter(fft_input, cutoff)
+        high_freq_target = self.high_pass_filter(fft_target, cutoff)
+        
+        # Compute the magnitude of the high-frequency components.
+        abs_high_freq_input = tf.abs(high_freq_input)
+        abs_high_freq_target = tf.abs(high_freq_target)
+        
+        # Calculate the loss.
+        if loss_type == "l1":
+            loss = tf.reduce_mean(tf.abs(abs_high_freq_input - abs_high_freq_target))
+        else:  # "l2"
+            loss = tf.reduce_mean(tf.square(abs_high_freq_input - abs_high_freq_target))
+        
+        return loss

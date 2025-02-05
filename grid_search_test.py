@@ -194,8 +194,8 @@ if __name__ == '__main__':
     args.test_data = '../PairLIE/data/hsi_dataset_indoor_only/test'
     
     args.eval_result_dir = 'D:/sslie/eval_results'
-    args.test_result_dir = 'D:/sslie/test_results_global_norm_max_1_74_divide_128p_indoor_comb_20250127_025826_1_74'
-    args.test_model_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor_comb/Decom_20250127_025826'
+    args.test_result_dir = 'D:/sslie/test_results_global_norm_max_1_74_divide_128p_indoor_comb_ft_0_08_v2_20250204_031001_1_74'
+    args.test_model_dir = './checkpoint/global_norm_max_1_74_divide_128p_indoor_comb_ft_0_08_v2/Decom_20250204_031001'
 
     # Train and Eval related args
     args.phase = 'test'
@@ -214,7 +214,7 @@ if __name__ == '__main__':
     mins = [None]
     args.post_scale = False
 
-    log_file_path = "lf_logs_global_norm_max_1_74_divide_128p_indoor_comb_20250127_025826_1_74.log"
+    log_file_path = "lf_logs_global_norm_max_1_74_divide_128p_indoor_comb_ft_0_08_v2_20250204_031001_1_74.log"
     label_dir = '../PairLIE/data/label_ll'
     test_result_dir = args.test_result_dir
     
