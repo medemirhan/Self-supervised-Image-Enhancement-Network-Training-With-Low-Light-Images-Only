@@ -4,6 +4,7 @@ from glob import glob
 import tensorflow as tf
 from model import lowlight_enhance
 from utils import *
+from datetime import datetime
 
 tf.compat.v1.disable_eager_execution()
 tf = tf.compat.v1  # Alias tf.compat.v1 as tf
@@ -147,7 +148,7 @@ def main(args):
             if args.channels is None:
                 first_image = load_hsi(glob(args.train_data + '/*.*')[0], matContentHeader=args.mat_key, normalization=args.normalization, max_val=args.global_max, min_val=args.global_min)
                 args.channels = first_image.shape[-1]
-            model = lowlight_enhance(sess, input_channels=args.channels)
+            model = lowlight_enhance(sess, input_channels=args.channels, time_stamp=args.timestamp)
             if args.phase == 'train':
                 lowlight_train(model, args)
             elif args.phase == 'test':
@@ -158,7 +159,7 @@ def main(args):
     else:
         print("[*] CPU\n")
         with tf.Session() as sess:
-            model = lowlight_enhance(sess)
+            model = lowlight_enhance(sess, time_stamp=args.timestamp)
             if args.phase == 'train':
                 lowlight_train(model, args)
             elif args.phase == 'test':
@@ -175,6 +176,7 @@ if __name__ == '__main__':
     args.gpu_idx = '0'
     args.gpu_mem = float(0.8)
     args.decom = 0
+    args.timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
 
     # Data related args
     args.mat_key = 'data'
@@ -192,8 +194,8 @@ if __name__ == '__main__':
     args.test_data = '../PairLIE/data/hsi_dataset_indoor_only/test'
     
     args.eval_result_dir = 'D:/sslie/eval_results_global_norm_max_1_74_divide_128p_indoor_comb_ft_0_1_v3'
-    args.test_result_dir = 'D:/sslie/test_results_20250120_124743/temp1'
-    args.test_model_dir = './checkpoint/Decom_20250120_124743'
+    args.test_result_dir = 'D:/sslie/test_results_' + args.timestamp
+    args.test_model_dir = './checkpoint/Decom_' + args.timestamp
 
     # Train and Eval related args
     args.phase = 'train'

@@ -2,7 +2,6 @@ import os
 import time
 import tensorflow as tf
 import numpy as np
-from datetime import datetime
 from utils import *
 import matplotlib
 matplotlib.use('Agg')
@@ -92,11 +91,11 @@ def RelightNet(input_L, input_R, channel=64, kernel_size=3):
     return output
 
 class lowlight_enhance(object):
-    def __init__(self, sess, input_channels=3, cutoff=0.1):
+    def __init__(self, sess, input_channels=3, cutoff=0.1, time_stamp=None):
         self.sess = sess
         self.DecomNet_layer_num = 5
         self.input_channels = input_channels  # Store channel count
-        self.model_timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
+        self.model_timestamp = time_stamp
         self.cutoff = cutoff
 
         # Generate band-specific weights
