@@ -1,0 +1,7 @@
+lf:0.20, min:None, max:1.741, mpsnr:12.161, mssim:0.287, msam:0.533
+lf:0.50, min:None, max:1.741, mpsnr:12.520, mssim:0.299, msam:0.533
+lf:0.90, min:None, max:1.741, mpsnr:12.999, mssim:0.314, msam:0.533
+lf:1.30, min:None, max:1.741, mpsnr:13.480, mssim:0.330, msam:0.533
+lf:1.70, min:None, max:1.741, mpsnr:13.962, mssim:0.346, msam:0.533
+lf:2.30, min:None, max:1.741, mpsnr:14.686, mssim:0.369, msam:0.533
+lf:2.80, min:None, max:1.741, mpsnr:15.291, mssim:0.389, msam:0.533

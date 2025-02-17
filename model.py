@@ -289,7 +289,7 @@ class lowlight_enhance(object):
         """
         Added plot_every_epoch parameter to control how often we plot losses
         """
-        eval_dir += '_' + self.model_timestamp
+        #eval_dir += '_' + self.model_timestamp
         ckpt_dir = os.path.join(ckpt_dir, 'Decom_' + self.model_timestamp)
         
         # Get channel dimension from input data
@@ -470,7 +470,7 @@ class lowlight_enhance(object):
 
             # evaluate the model and save a checkpoint file for it
             if (epoch + 1) % eval_every_epoch == 0:
-                self.evaluate(epoch + 1, eval_low_data, sample_dir=eval_dir, train_phase='Combined')
+                #self.evaluate(epoch + 1, eval_low_data, sample_dir=eval_dir, train_phase='Combined')
                 self.save(saver, iter_num, ckpt_dir, "RetinexNet-%s" % 'Combined')
 
         print("[*] Finish training for phase %s." % train_phase)
