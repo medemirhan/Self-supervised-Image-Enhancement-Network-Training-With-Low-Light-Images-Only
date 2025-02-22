@@ -6,6 +6,8 @@ from utils import *
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import random
+from sklearn.decomposition import PCA, NMF
 
 tf.compat.v1.disable_eager_execution()
 tf = tf.compat.v1  # Alias tf.compat.v1 as tf
@@ -13,6 +15,21 @@ tf = tf.compat.v1  # Alias tf.compat.v1 as tf
 seed_value = 42
 tf.set_random_seed(seed_value)
 np.random.seed(seed_value)
+random.seed(seed_value)
+os.environ['PYTHONHASHSEED'] = str(seed_value)
+
+# Configure GPU options
+config = tf.compat.v1.ConfigProto()
+config.gpu_options.allow_growth = False  # Set allow_growth to False
+config.intra_op_parallelism_threads = 1
+config.inter_op_parallelism_threads = 1
+
+os.environ['TF_DETERMINISTIC_OPS'] = '1'
+tf.config.set_visible_devices([], 'GPU')
+
+# Set the session with the config
+session = tf.compat.v1.Session(config=config)
+tf.compat.v1.keras.backend.set_session(session)
 
 def concat(layers):
     return tf.concat(layers, axis=3)
@@ -160,7 +177,11 @@ class lowlight_enhance(object):
         #self.recon_loss_low = tf.reduce_mean(tf.abs(tf.math.pow(I_low_expanded, 0.2) * R_low - self.input_high))
         
         # Modified to handle multiple channels
-        R_low_max = tf.reduce_max(R_low, axis=3, keepdims=True)
+        #R_low_max = tf.reduce_max(R_low, axis=3, keepdims=True)
+        R_low_max_sq = tf.squeeze(R_low, axis=0)
+        R_low_max = self.pca_projection(R_low_max_sq)
+        R_low_max = tf.expand_dims(R_low_max, axis=0)
+        #self.recon_loss_low_eq = tf.reduce_mean(tf.abs(tf.cast(R_low_max, tf.float32) - self.input_low_eq))
         self.recon_loss_low_eq = tf.reduce_mean(tf.abs(R_low_max - self.input_low_eq))
         #self.recon_loss_low_eq = tf.reduce_mean(tf.square(R_low_max - self.input_low_eq))
         
@@ -175,7 +196,7 @@ class lowlight_enhance(object):
 
         self.loss_Decom_zhangyu = (self.recon_loss_low + 
                                   1 * self.Ismooth_loss_low + 
-                                  0 * self.recon_loss_low_eq + 
+                                  1 * self.recon_loss_low_eq + 
                                   1 * self.R_low_loss_smooth)
 
         self.Ismooth_loss_delta = self.smooth(I_delta, R_low)
@@ -191,7 +212,7 @@ class lowlight_enhance(object):
         self.loss_combined = (1 * self.loss_Decom_zhangyu + 
                               2 * self.loss_Relight + 
                               0.2 * self.fourier_loss +
-                              2 * self.spectral_loss)
+                              0 * self.spectral_loss)
 
         self.lr = tf.placeholder(tf.float32, name='learning_rate')
         optimizer = tf.train.AdamOptimizer(self.lr, name='AdamOptimizer')
@@ -902,3 +923,78 @@ class lowlight_enhance(object):
             loss = tf.reduce_mean(tf.square(spectral_diff))
         
         return loss
+
+    def pca_projection(self, hyper_img):
+        def calc_pca(hyper_img_np):
+            """
+            Applies PCA on a hyperspectral image and returns the first principal component as a single-channel image.
+            
+            Parameters:
+                hyper_img_np (np.ndarray): Input hyperspectral image of shape (h, w, c).
+            
+            Returns:
+                pc1_img (np.ndarray): Output single-channel image of shape (h, w, 1) using the first principal component.
+            """
+            # Get the dimensions
+            h, w, c = hyper_img_np.shape
+            
+            # Reshape the image to a 2D array: each row is a pixel with c spectral features
+            reshaped_img = hyper_img_np.reshape(-1, c)
+            
+            # Initialize PCA to reduce to 1 component
+            pca = PCA(n_components=1)
+            
+            # Fit PCA and transform the data to obtain the first principal component
+            pc1 = pca.fit_transform(reshaped_img)  # Shape: (h*w, 1)
+            
+            # Reshape the result back to the original image spatial dimensions
+            pc1_img = pc1.reshape(h, w, 1)
+            
+            return pc1_img
+        
+        projection = tf.py_func(
+            func=calc_pca,
+            inp=[hyper_img],
+            Tout=tf.float32
+        )
+        # Manually set the shape if known, e.g., [None, None, 1]
+        projection.set_shape([None, None, 1])
+        return projection
+
+    def nmf_projection(self, hyper_img, n_components=1, init='nndsvda', random_state=0):
+        def calc_nmf(hyper_img_np):
+            """
+            Applies Nonnegative Matrix Factorization (NMF) on a hyperspectral image and returns a 
+            single-channel image using the NMF component. The output values are nonnegative.
+            
+            Parameters:
+                hyper_img_np (np.ndarray): Input hyperspectral image of shape (h, w, c). 
+                                        Ensure the data is nonnegative (e.g., normalized or using absolute values).
+                n_components (int): Number of components for NMF. Default is 1.
+                init (str): Initialization method. 'nndsvda' works well in many cases.
+                random_state (int): Random state for reproducibility.
+            
+            Returns:
+                nmf_img (np.ndarray): Output single-channel image of shape (h, w) from NMF.
+            """
+            h, w, c = hyper_img_np.shape
+            # Reshape the image: each row corresponds to a pixel's spectral signature.
+            reshaped_img = hyper_img_np.reshape(-1, c)
+            
+            # Create and fit the NMF model.
+            nmf_model = NMF(n_components=n_components, init=init, random_state=random_state, max_iter=500)
+            W = nmf_model.fit_transform(reshaped_img)
+        
+            # For n_components=1, W is (h*w, 1). Reshape it back to the spatial dimensions.
+            nmf_img = W.reshape(h, w, 1)
+        
+            return nmf_img
+        
+        projection = tf.py_func(
+            func=calc_nmf,
+            inp=[hyper_img],
+            Tout=tf.float32
+        )
+        # Manually set the shape if known, e.g., [None, None, 1]
+        projection.set_shape([None, None, 1])
+        return projection

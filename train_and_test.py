@@ -6,6 +6,7 @@ from model import lowlight_enhance
 from utils import *
 from datetime import datetime
 import metrics
+import random
 
 tf.compat.v1.disable_eager_execution()
 tf = tf.compat.v1  # Alias tf.compat.v1 as tf
@@ -13,6 +14,21 @@ tf = tf.compat.v1  # Alias tf.compat.v1 as tf
 seed_value = 42
 tf.set_random_seed(seed_value)
 np.random.seed(seed_value)
+random.seed(seed_value)
+os.environ['PYTHONHASHSEED'] = str(seed_value)
+
+# Configure GPU options
+config = tf.compat.v1.ConfigProto()
+config.gpu_options.allow_growth = False  # Set allow_growth to False
+config.intra_op_parallelism_threads = 1
+config.inter_op_parallelism_threads = 1
+
+os.environ['TF_DETERMINISTIC_OPS'] = '1'
+tf.config.set_visible_devices([], 'GPU')
+
+# Set the session with the config
+session = tf.compat.v1.Session(config=config)
+tf.compat.v1.keras.backend.set_session(session)
 
 def lowlight_train(lowlight_enhance, args):
     if not os.path.exists(args.model_ckpt_dir):
@@ -43,8 +59,9 @@ def lowlight_train(lowlight_enhance, args):
         train_high_data.append(high_im)
         
         # Calculate max channel for equalization (across all spectral bands)
-        train_low_data_max_chan = np.max(high_im, axis=2, keepdims=True)
-        train_low_data_max_channel = histeq(train_low_data_max_chan)
+        '''train_low_data_max_chan = np.max(high_im, axis=2, keepdims=True)
+        train_low_data_max_channel = histeq(train_low_data_max_chan)'''
+        train_low_data_max_channel = pca_projection(high_im)
         train_low_data_eq.append(train_low_data_max_channel)
 
     eval_low_data = []
@@ -206,7 +223,7 @@ if __name__ == '__main__':
     args.eval_data = '../PairLIE/data/hsi_dataset_indoor_only/eval'
     args.test_data = '../PairLIE/data/hsi_dataset_indoor_only/test'
     args.label_dir = '../PairLIE/data/label_ll'
-    args.model_name = 'fft'
+    args.model_name = 'pca_0_1'
     args.phase = 'train_and_test'
 
     # Train and Eval related args
