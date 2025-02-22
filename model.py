@@ -41,7 +41,8 @@ def DecomNet(input_im, layer_num, channel=64, kernel_size=3, is_training=True):
     
     # Calculate channel-wise maximum
     input_max = tf.reduce_max(input_im, axis=3, keepdims=True)
-    input_concat = concat([input_max, input_im])
+    #input_concat = concat([input_max, input_im])
+    input_concat = input_im
     
     # Get the concatenated channel dimension (static)
     concat_channels = input_channels + 1  # original channels + max channel
@@ -71,7 +72,63 @@ def DecomNet(input_im, layer_num, channel=64, kernel_size=3, is_training=True):
 
     return R, L
 
-def RelightNet(input_L, input_R, channel=64, kernel_size=3):
+def se_block(input_feature, reduction_ratio=16, scope="se_block"):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+        channels = input_feature.get_shape().as_list()[-1]
+        # Global average pooling (squeeze)
+        squeeze = tf.reduce_mean(input_feature, axis=[1, 2], keepdims=True)
+        # Two fully connected layers for excitation
+        excitation = tf.layers.dense(squeeze, units=channels // reduction_ratio, activation=tf.nn.relu, name='fc1')
+        excitation = tf.layers.dense(excitation, units=channels, activation=tf.sigmoid, name='fc2')
+        # Scale the input feature maps
+        scale = input_feature * excitation
+    return scale
+
+def transformer_block(input_tensor, num_heads=4, head_dim=16, ff_dim=64, scope="transformer_block"):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
+        # Input tensor shape: [B, H, W, C]
+        shape = tf.shape(input_tensor)
+        B, H, W = shape[0], shape[1], shape[2]
+        C = input_tensor.get_shape().as_list()[-1]
+        seq_len = H * W
+        # Flatten spatial dimensions: [B, H*W, C]
+        x = tf.reshape(input_tensor, [B, seq_len, C])
+        
+        # Linear projections for Query, Key, and Value
+        Q = tf.layers.dense(x, num_heads * head_dim, name='Q')
+        K = tf.layers.dense(x, num_heads * head_dim, name='K')
+        V = tf.layers.dense(x, num_heads * head_dim, name='V')
+        
+        # Reshape for multi-head attention: [B, seq_len, num_heads, head_dim]
+        Q = tf.reshape(Q, [B, seq_len, num_heads, head_dim])
+        K = tf.reshape(K, [B, seq_len, num_heads, head_dim])
+        V = tf.reshape(V, [B, seq_len, num_heads, head_dim])
+        
+        # Transpose to [B, num_heads, seq_len, head_dim]
+        Q = tf.transpose(Q, [0, 2, 1, 3])
+        K = tf.transpose(K, [0, 2, 1, 3])
+        V = tf.transpose(V, [0, 2, 1, 3])
+        
+        # Compute attention scores
+        scale = tf.sqrt(tf.cast(head_dim, tf.float32))
+        attn_logits = tf.matmul(Q, K, transpose_b=True) / scale  # [B, num_heads, seq_len, seq_len]
+        attn_weights = tf.nn.softmax(attn_logits, axis=-1)
+        attn_output = tf.matmul(attn_weights, V)  # [B, num_heads, seq_len, head_dim]
+        
+        # Transpose and reshape back to [B, seq_len, num_heads * head_dim]
+        attn_output = tf.transpose(attn_output, [0, 2, 1, 3])
+        attn_output = tf.reshape(attn_output, [B, seq_len, num_heads * head_dim])
+        
+        # Feed-forward network with residual connection
+        ff_output = tf.layers.dense(attn_output, ff_dim, activation=tf.nn.relu, name='ff_dense1')
+        ff_output = tf.layers.dense(ff_output, C, name='ff_dense2')
+        output_seq = x + ff_output  # Residual connection
+        
+        # Reshape back to [B, H, W, C]
+        output = tf.reshape(output_seq, [B, H, W, C])
+    return output
+
+def RelightNet(input_L, input_R, channel=64, kernel_size=3, use_attention=False, use_transformer=False):
     # Get number of spectral channels from reflectance input
     num_spectral_channels = input_R.get_shape().as_list()[3]  # input_R is H×W×C (64 in your case)
     # input_L is H×W×1
@@ -81,18 +138,25 @@ def RelightNet(input_L, input_R, channel=64, kernel_size=3):
     
     with tf.variable_scope('RelightNet'):
         # Encoder path
-        conv0 = tf.layers.conv2d(input_im, channel, kernel_size, padding='same', activation=None)
-        conv1 = tf.layers.conv2d(conv0, channel, kernel_size, strides=2, padding='same', activation=tf.nn.relu)
-        conv2 = tf.layers.conv2d(conv1, channel, kernel_size, strides=2, padding='same', activation=tf.nn.relu)
-        conv3 = tf.layers.conv2d(conv2, channel, kernel_size, strides=2, padding='same', activation=tf.nn.relu)
+        conv0 = tf.layers.conv2d(input_im, channel, kernel_size, padding='same', activation=None, name='conv0')
+        conv1 = tf.layers.conv2d(conv0, channel, kernel_size, strides=2, padding='same', activation=tf.nn.relu, name='conv1')
+        conv2 = tf.layers.conv2d(conv1, channel, kernel_size, strides=2, padding='same', activation=tf.nn.relu, name='conv2')
+        conv3 = tf.layers.conv2d(conv2, channel, kernel_size, strides=2, padding='same', activation=tf.nn.relu, name='conv3')
+        
+        # Option 1: Apply attention block (if selected)
+        if use_attention:
+            conv3 = se_block(conv3, reduction_ratio=16, scope="se_block")
+        # Option 2: Apply transformer block
+        elif use_transformer:
+            conv3 = transformer_block(conv3, num_heads=4, head_dim=16, ff_dim=64, scope="transformer_block")
         
         # Decoder path with skip connections
         up1 = tf.image.resize_nearest_neighbor(conv3, (tf.shape(conv2)[1], tf.shape(conv2)[2]))
-        deconv1 = tf.layers.conv2d(up1, channel, kernel_size, padding='same', activation=tf.nn.relu) + conv2
+        deconv1 = tf.layers.conv2d(up1, channel, kernel_size, padding='same', activation=tf.nn.relu, name='deconv1') + conv2
         up2 = tf.image.resize_nearest_neighbor(deconv1, (tf.shape(conv1)[1], tf.shape(conv1)[2]))
-        deconv2 = tf.layers.conv2d(up2, channel, kernel_size, padding='same', activation=tf.nn.relu) + conv1
+        deconv2 = tf.layers.conv2d(up2, channel, kernel_size, padding='same', activation=tf.nn.relu, name='deconv2') + conv1
         up3 = tf.image.resize_nearest_neighbor(deconv2, (tf.shape(conv0)[1], tf.shape(conv0)[2]))
-        deconv3 = tf.layers.conv2d(up3, channel, kernel_size, padding='same', activation=tf.nn.relu) + conv0
+        deconv3 = tf.layers.conv2d(up3, channel, kernel_size, padding='same', activation=tf.nn.relu, name='deconv3') + conv0
         
         # Multi-scale feature fusion
         deconv1_resize = tf.image.resize_nearest_neighbor(deconv1, (tf.shape(deconv3)[1], tf.shape(deconv3)[2]))
@@ -100,10 +164,10 @@ def RelightNet(input_L, input_R, channel=64, kernel_size=3):
         feature_gather = concat([deconv1_resize, deconv2_resize, deconv3])
         
         # Feature fusion with preserved spectral dimensionality
-        feature_fusion = tf.layers.conv2d(feature_gather, channel, 1, padding='same', activation=None)
+        feature_fusion = tf.layers.conv2d(feature_gather, channel, 1, padding='same', activation=None, name='feature_fusion')
         
         # Final layer outputs a single channel (illumination delta)
-        output = tf.layers.conv2d(feature_fusion, 1, 3, padding='same', activation=None)
+        output = tf.layers.conv2d(feature_fusion, 1, 3, padding='same', activation=None, name='final_conv')
     
     return output
 
@@ -194,7 +258,7 @@ class lowlight_enhance(object):
         
         self.Ismooth_loss_low = self.smooth(I_low, R_low_gray)
 
-        self.loss_Decom_zhangyu = (self.recon_loss_low + 
+        self.loss_Decom_zhangyu = (1 * self.recon_loss_low + 
                                   1 * self.Ismooth_loss_low + 
                                   1 * self.recon_loss_low_eq + 
                                   1 * self.R_low_loss_smooth)
