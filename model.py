@@ -43,10 +43,7 @@ def DecomNet(input_im, layer_num, channel=64, kernel_size=3, is_training=True):
     input_max = tf.reduce_max(input_im, axis=3, keepdims=True)
     #input_concat = concat([input_max, input_im])
     input_concat = input_im
-    
-    # Get the concatenated channel dimension (static)
-    concat_channels = input_channels + 1  # original channels + max channel
-    
+
     with tf.variable_scope('DecomNet', reuse=tf.AUTO_REUSE):
         # First layer with fixed number of output channels
         conv_0 = tf.layers.conv2d(input_concat, channel//2, kernel_size, padding='same', activation=tf.nn.relu, name="first_layer")
@@ -128,7 +125,7 @@ def transformer_block(input_tensor, num_heads=4, head_dim=16, ff_dim=64, scope="
         output = tf.reshape(output_seq, [B, H, W, C])
     return output
 
-def RelightNet(input_L, input_R, channel=64, kernel_size=3, use_attention=False, use_transformer=False):
+def RelightNet(input_L, input_R, channel=64, kernel_size=3, use_attention=False, use_transformer=True):
     # Get number of spectral channels from reflectance input
     num_spectral_channels = input_R.get_shape().as_list()[3]  # input_R is H×W×C (64 in your case)
     # input_L is H×W×1
@@ -172,7 +169,7 @@ def RelightNet(input_L, input_R, channel=64, kernel_size=3, use_attention=False,
     return output
 
 class lowlight_enhance(object):
-    def __init__(self, sess, input_channels=3, cutoff=0.1, time_stamp=None):
+    def __init__(self, sess, input_channels=3, cutoff=0.1, time_stamp=None, coeff_recon_loss_low=None, coeff_Ismooth_loss_low=None, coeff_recon_loss_low_eq=None, coeff_R_low_loss_smooth=None, coeff_relight_loss=None, coeff_Ismooth_loss_delta=None, coeff_fourier_loss=None, coeff_spectral_loss=None):
         self.sess = sess
         self.DecomNet_layer_num = 5
         self.input_channels = input_channels  # Store channel count
@@ -258,25 +255,29 @@ class lowlight_enhance(object):
         
         self.Ismooth_loss_low = self.smooth(I_low, R_low_gray)
 
-        self.loss_Decom_zhangyu = (1 * self.recon_loss_low + 
-                                  1 * self.Ismooth_loss_low + 
-                                  1 * self.recon_loss_low_eq + 
-                                  1 * self.R_low_loss_smooth)
+        self.loss_Decom_zhangyu = (coeff_recon_loss_low * self.recon_loss_low + 
+                                  coeff_Ismooth_loss_low * self.Ismooth_loss_low + 
+                                  coeff_recon_loss_low_eq * self.recon_loss_low_eq + 
+                                  coeff_R_low_loss_smooth * self.R_low_loss_smooth)
 
         self.Ismooth_loss_delta = self.smooth(I_delta, R_low)
         self.relight_loss = tf.reduce_mean(tf.abs(R_low * I_delta_expanded - self.input_high))
-        self.loss_Relight = (0.1 * self.relight_loss + 
-                             10 * self.Ismooth_loss_delta)
+        self.loss_Relight = (coeff_relight_loss * self.relight_loss + 
+                             coeff_Ismooth_loss_delta * self.Ismooth_loss_delta)
         
         self.fourier_loss = self.fourier_spectrum_loss(self.input_low, self.output_S, cutoff=self.cutoff, loss_type="l1")
 
         self.spectral_loss = self.spectral_smoothness_loss(self.output_S)
 
         #self.loss_combined = self.loss_Decom_zhangyu + self.loss_Relight
-        self.loss_combined = (1 * self.loss_Decom_zhangyu + 
-                              2 * self.loss_Relight + 
-                              0.2 * self.fourier_loss +
-                              0 * self.spectral_loss)
+        self.loss_combined = (coeff_recon_loss_low * self.recon_loss_low + 
+                              coeff_Ismooth_loss_low * self.Ismooth_loss_low + 
+                              coeff_recon_loss_low_eq * self.recon_loss_low_eq + 
+                              coeff_R_low_loss_smooth * self.R_low_loss_smooth +
+                              coeff_relight_loss * self.relight_loss + 
+                              coeff_Ismooth_loss_delta * self.Ismooth_loss_delta + 
+                              coeff_fourier_loss * self.fourier_loss + 
+                              coeff_spectral_loss * self.spectral_loss)
 
         self.lr = tf.placeholder(tf.float32, name='learning_rate')
         optimizer = tf.train.AdamOptimizer(self.lr, name='AdamOptimizer')
