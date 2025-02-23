@@ -583,7 +583,7 @@ class lowlight_enhance(object):
             print("[*] Failed to load model from %s" % ckpt_dir)
             return False, 0
 
-    def test(self, model_dir, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag, lum_factor, data_min=None, data_max=None):
+    def test(self, model_dir, test_low_data, test_high_data, test_low_data_names, save_dir, decom_flag):
         tf.global_variables_initializer().run()
 
         model_dir_decom = os.path.join(model_dir)

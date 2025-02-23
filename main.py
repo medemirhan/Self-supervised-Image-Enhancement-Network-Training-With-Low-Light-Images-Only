@@ -115,9 +115,6 @@ def lowlight_test(lowlight_enhance, args):
 
     data_min = None
     data_max = None
-    if args.post_scale:
-        data_min = args.global_min
-        data_max = args.global_max
 
     lowlight_enhance.test(
         model_dir=args.test_model_dir,
@@ -125,10 +122,7 @@ def lowlight_test(lowlight_enhance, args):
         test_high_data=test_high_data, 
         test_low_data_names=test_low_data_name, 
         save_dir=args.test_result_dir, 
-        decom_flag=args.decom,
-        lum_factor=args.lum_factor,
-        data_min=data_min,
-        data_max=data_max
+        decom_flag=args.decom
     )
 
     im_dir = args.test_result_dir + '/*.mat'
