@@ -5,6 +5,8 @@ from torchmetrics.functional.image import peak_signal_noise_ratio, structural_si
 from utils import load_hsi
 from skimage.metrics import peak_signal_noise_ratio as psnr_skimage
 from skimage.metrics import structural_similarity as ssim_skimage
+import numpy as np
+import scipy.io as sio
 
 def psnr(input, target, data_range=None):
     return peak_signal_noise_ratio(input, target, data_range=data_range)
@@ -12,6 +14,16 @@ def psnr(input, target, data_range=None):
 def ssim(input, target, data_range=None):
     im1 = input.unsqueeze(0)
     im2 = target.unsqueeze(0)
+    return structural_similarity_index_measure(im1, im2, data_range=data_range)
+
+def sam_bandwise(input, target, reduction='elementwise_mean'):
+    im1 = input.unsqueeze(0).unsqueeze(0)
+    im2 = target.unsqueeze(0).unsqueeze(0)
+    return spectral_angle_mapper(im1, im2, reduction=reduction)
+
+def ssim_bandwise(input, target, data_range=None):
+    im1 = input.unsqueeze(0).unsqueeze(0)
+    im2 = target.unsqueeze(0).unsqueeze(0)
     return structural_similarity_index_measure(im1, im2, data_range=data_range)
 
 def sam(input, target, reduction='elementwise_mean'):
@@ -30,6 +42,35 @@ def ssim_sk(input, target, data_range=None):
         return ssim_skimage(input, target)
     else:
         return ssim_skimage(input, target, data_range=data_range[1] - data_range[0])
+
+def single_img_bandwise_metrics(pred_path, label_path, data_min=None, data_max=None, matKeyPrediction='data', matKeyGt='data'):
+    im1 = load_hsi(pred_path, matContentHeader=matKeyPrediction)
+    im2 = load_hsi(label_path, matContentHeader=matKeyGt)
+
+    im1 = torch.from_numpy(im1).to(dtype=torch.float32)
+    im2 = torch.from_numpy(im2).to(dtype=torch.float32)
+
+    data_range = None
+    if data_min != None and data_max != None:
+        data_range = (data_min, data_max)
+        print("====> WARNING: Data will be clamped between data range values <====")
+    elif data_max != None:
+        data_range = data_max
+
+    h, w, c = im1.shape
+    psnr_vec = []
+    ssim_vec = []
+    #sam_vec = []
+    for i in range(c):
+        score_psnr = psnr(im1[:,:,i], im2[:,:,i], data_range=data_range) # data range onemli. incele!
+        score_ssim = ssim_bandwise(im1[:,:,i], im2[:,:,i], data_range=data_range) # data range onemli. incele!
+        #score_sam = sam_bandwise(im1[:,:,i], im2[:,:,i], reduction='elementwise_mean') # reduction onemli. incele!
+
+        psnr_vec.append(score_psnr)
+        ssim_vec.append(score_ssim)
+        #sam_vec.append(score_sam)
+
+    return np.array(psnr_vec), np.array(ssim_vec)
 
 def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPrediction='data', matKeyGt='data'):    
     avg_psnr = 0
@@ -58,6 +99,10 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
         score_ssim = ssim(im1, im2, data_range=data_range) # data range onemli. incele!
         score_sam = sam(im1, im2, reduction='elementwise_mean') # reduction onemli. incele!
     
+        print(f'\n===> {name} | PSNR : {score_psnr:.4f}')
+        print(f'===> {name} | SSIM : {score_ssim:.4f}')
+        print(f'===> {name} | SAM  : {score_sam:.4f}')
+
         avg_psnr += score_psnr
         avg_ssim += score_ssim
         avg_sam += score_sam
@@ -77,22 +122,10 @@ if __name__ == '__main__':
     normalLightMin = 0.0708354
     normalLightMax = 1.7410845
 
-    '''globalMin = lowLightMin
-    globalMax = lowLightMax'''
-
-    '''im_dir = 'D:/sslie/test_results_3rd/post_scaled/renamed/*.mat'
-    label_dir = '../PairLIE/data/label_ll'''
-
-    '''im_dir = 'D:/sslie/test_results_2nd/non_scaled/renamed/*.mat'
-    label_dir = '../PairLIE/data/CZ_hsdb/lowered_1.9/gt'''
-
-    '''im_dir = 'D:/sslie/test_results_20250112_165938/*.mat'
-    label_dir = '../PairLIE/data/label_ll'''
-
     im_dir = 'D:/sslie/test_results_20250120_124743/temp1/*.mat'
     label_dir = '../PairLIE/data/label_ll'
 
-    avg_psnr, avg_ssim, avg_sam = calc_metrics(
+    '''avg_psnr, avg_ssim, avg_sam = calc_metrics(
         im_dir=os.path.normpath(im_dir),
         label_dir=os.path.normpath(label_dir),
         data_min=None,
@@ -101,6 +134,18 @@ if __name__ == '__main__':
         matKeyGt='data'
         )
 
-    print("\n===> Avg.PSNR : {:.4f} dB ".format(avg_psnr))
-    print("===> Avg.SSIM : {:.4f} ".format(avg_ssim))
-    print("===> Avg.SAM  : {:.4f} ".format(avg_sam))
+    print(f'\n===> Avg.PSNR : {avg_psnr:.4f}')
+    print(f'===> Avg.SSIM : {avg_ssim:.4f}')
+    print(f'===> Avg.SAM  : {avg_sam:.4f}')'''
+    
+    psnr_vec, ssim_vec = single_img_bandwise_metrics(
+        pred_path='C:/Users/medemirhan/Desktop/comparison/msr/5/buildingblock.mat',
+        label_path='C:/Users/medemirhan/Desktop/n2n/PairLIE/data/label_ll/buildingblock.mat',
+        data_min=None,
+        data_max=globalMax,
+        matKeyPrediction='data',
+        matKeyGt='data'
+        )
+    
+    sio.savemat('./psnr_vec6.mat', {"data": np.array(psnr_vec)})
+    sio.savemat('./ssim_vec6.mat', {"data": np.array(ssim_vec)})
