@@ -69,7 +69,7 @@ def eval_metrics(args):
 
 def main(args):
     # Set random seeds for reproducibility
-    seed_value = 42
+    seed_value = 41
     random.seed(seed_value)
     np.random.seed(seed_value)
     torch.manual_seed(seed_value)
