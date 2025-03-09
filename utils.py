@@ -174,8 +174,6 @@ def inverse_per_channel_standardization(predictions, mean_vals, std_vals):
 def save_hsi(filepath, data, postfix=None, key='ref'):
     """Save hyperspectral image as .mat file"""
 
-    data = np.squeeze(data)
-
     savepath = filepath[:-4]
     if postfix != None:
         savepath += postfix
@@ -223,7 +221,7 @@ def polynomial_decay(initial_value, decay_rate, power, step):
     """
     return initial_value / (1 + decay_rate * step) ** power
 
-def pca_projection(hyper_img):
+def pca_projection(hyper_img, seed=42):
     """
     Applies PCA on a hyperspectral image and returns the first principal component as a single-channel image.
     
@@ -240,7 +238,7 @@ def pca_projection(hyper_img):
     reshaped_img = hyper_img.reshape(-1, c)
     
     # Initialize PCA to reduce to 1 component
-    pca = PCA(n_components=1)
+    pca = PCA(n_components=1, random_state=seed)
     
     # Fit PCA and transform the data to obtain the first principal component
     pc1 = pca.fit_transform(reshaped_img)  # Shape: (h*w, 1)
