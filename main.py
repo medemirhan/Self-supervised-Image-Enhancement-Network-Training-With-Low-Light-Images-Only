@@ -4,6 +4,7 @@ import numpy as np
 import random
 from datetime import datetime
 import torch
+import mlflow
 from model import LowLightEnhance
 from utils import load_hsi, Struct
 from metrics import calc_metrics
@@ -19,6 +20,8 @@ def train(model, args):
         ckpt_dir=args.model_ckpt_dir,
         eval_result_dir=args.eval_result_dir,
         eval_every_epoch=args.eval_every_epoch,
+        max_val=args.global_max,
+        min_val=args.global_min, 
         plot_every_epoch=args.plot_every_epoch
         )
 
@@ -63,18 +66,21 @@ def eval_metrics(args):
     # Format the log entry
     log_entry = f"min:{strMin}, max:{args.global_max:.3f}, mpsnr:{avg_psnr:.3f}, mssim:{avg_ssim:.3f}, msam:{avg_sam:.3f}\n"
 
-    with open(args.log_file_path, "a") as log_file:
+    '''with open(args.log_file_path, "a") as log_file:
         # Write the log entry to the file
-        log_file.write(log_entry)
+        log_file.write(log_entry)'''
+
+    mlflow.log_metric("PSNR_dB", avg_psnr.item())
+    mlflow.log_metric("SSIM", avg_ssim.item())
+    mlflow.log_metric("SAM", avg_sam.item())
 
 def main(args):
     # Set random seeds for reproducibility
-    seed_value = 41
-    random.seed(seed_value)
-    np.random.seed(seed_value)
-    torch.manual_seed(seed_value)
+    random.seed(args.seed_value)
+    np.random.seed(args.seed_value)
+    torch.manual_seed(args.seed_value)
     if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed_value)
+        torch.cuda.manual_seed_all(args.seed_value)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     
@@ -84,6 +90,7 @@ def main(args):
     # Create model
     model = LowLightEnhance(
         input_channels=args.channels,
+        lr=args.start_lr,
         time_stamp=args.timestamp,
         coeff_recon_loss_low=args.coeff_recon_loss_low, 
         coeff_Ismooth_loss_low=args.coeff_Ismooth_loss_low,
@@ -109,24 +116,36 @@ def main(args):
     if args.channels is None:
         args.channels = first_image.shape[-1]
     
-    if args.phase == 'train':
-        train(model, args)
-    elif args.phase == 'test':
-        test(model, args)
-        eval_metrics(args)
-    elif args.phase == 'train_and_test':
-        train(model, args)
-        test(model, args)
-        eval_metrics(args)
-    else:
-        print('[!] Unknown phase')
-        exit(0)
+    mlflow.set_experiment(args.full_model_name)
+    with mlflow.start_run():
+        mlflow.log_param('phase', args.phase)
+        mlflow.log_param('data_min', args.global_min)
+        mlflow.log_param('data_max', args.global_max)
+        mlflow.log_param('seed', args.seed_value)
+        
+        if args.phase == 'train':
+            mlflow.log_param('data_train', args.train_data)
+            train(model, args)
+        elif args.phase == 'test':
+            mlflow.log_param('data_test', args.test_data)
+            test(model, args)
+            eval_metrics(args)
+        elif args.phase == 'train_and_test':
+            mlflow.log_param('data_train', args.train_data)
+            mlflow.log_param('data_test', args.test_data)
+            train(model, args)
+            test(model, args)
+            eval_metrics(args)
+        else:
+            print('[!] Unknown phase')
+            exit(0)
 
 if __name__ == '__main__':
     args = Struct()
 
     # Common args
     args.use_gpu = 1
+    args.seed_value = 41
     args.gpu_idx = '0'
     args.gpu_mem = float(0.8)
     args.decom = 0
@@ -159,7 +178,7 @@ if __name__ == '__main__':
     args.eval_data = '../PairLIE/data/hsi_dataset_indoor_only/eval'
     args.test_data = '../PairLIE/data/hsi_dataset_indoor_only/test'
     args.label_dir = '../PairLIE/data/label_ll'
-    args.model_name = 'torch1'
+    args.model_name = 'torch_exp'
     args.phase = 'train_and_test'
     args.epoch = 400
     args.eval_every_epoch = 100

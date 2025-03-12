@@ -3,9 +3,10 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchinfo import summary
 import numpy as np
 from glob import glob
-import random
+import mlflow
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('Agg')
@@ -155,7 +156,7 @@ class RelightNet(nn.Module):
         return output
 
 class LowLightEnhance(nn.Module):
-    def __init__(self, input_channels=64, time_stamp=None, 
+    def __init__(self, input_channels=64, lr=1e-3, time_stamp=None, 
                  coeff_recon_loss_low=10, coeff_Ismooth_loss_low=1, coeff_recon_loss_low_eq=1,
                  coeff_R_low_loss_smooth=1, coeff_relight_loss=0.2, coeff_Ismooth_loss_delta=20,
                  coeff_fourier_loss=0.2, coeff_spectral_loss=1, device=torch.device("cpu")):
@@ -171,11 +172,12 @@ class LowLightEnhance(nn.Module):
         self.coeff_Ismooth_loss_delta = coeff_Ismooth_loss_delta
         self.coeff_fourier_loss = coeff_fourier_loss
         self.coeff_spectral_loss = coeff_spectral_loss
+        self.lr = lr
         
         self.decom_net = DecomNet(in_channels=input_channels)
         self.relight_net = RelightNet(in_channels=input_channels)
         
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         
         self.all_epoch_losses = {'total_loss': [], 'recon_loss': [], 'recon_loss_eq': [], 'R_smooth_loss': [],
                              'I_smooth_loss': [], 'I_smooth_loss_delta': [], 'relight_loss': [],
@@ -187,6 +189,133 @@ class LowLightEnhance(nn.Module):
         I_delta = self.relight_net(I_low, R_low)
         S = R_low * I_delta + R_low * I_low
         return R_low, I_low, I_delta, S
+    
+    def train_model(self, train_data_path, eval_data_path, batch_size, patch_size, num_epochs, start_lr, ckpt_dir, eval_result_dir, eval_every_epoch, max_val=None, min_val=None, plot_every_epoch=10):
+        ckpt_dir = os.path.join(ckpt_dir, 'Decom_' + self.time_stamp)
+        
+        os.makedirs(ckpt_dir, exist_ok=True)
+        os.makedirs(eval_result_dir, exist_ok=True)
+        train_files = sorted(glob(os.path.join(train_data_path, "*.*")))
+        train_low_data = []
+        train_high_data = []
+        train_low_data_eq = []
+        for file in train_files:
+            low_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=max_val, min_val=min_val)
+            train_low_data.append(low_im)
+            high_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=max_val, min_val=min_val)
+            train_high_data.append(high_im)
+            low_eq = pca_projection(low_im)
+            if low_eq.ndim == 2:
+                low_eq = low_eq[:, :, None]
+            train_low_data_eq.append(low_eq)
+        eval_low_data = []
+        eval_files = sorted(glob(os.path.join(eval_data_path, "*.*")))
+        for file in eval_files:
+            eval_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=1.7410845, min_val=0.0708354)
+            eval_low_data.append(eval_im)
+        
+        num_batches = len(train_low_data) // batch_size
+        lr_schedule = [start_lr] * num_epochs
+        iter_num = 0
+
+        log_params = {
+            "epochs": num_epochs,
+            "lr": start_lr,
+            "batch_size": batch_size,
+            "optimizer": "Adam",
+        }
+        # Log training parameters.
+        mlflow.log_params(log_params)
+
+        # Log model summary.
+        summary_path = os.path.join(ckpt_dir, "model_summary.txt")
+        with open(summary_path, "w", encoding="utf-8") as f:
+            f.write(str(summary(self)))
+        mlflow.log_artifact(summary_path)
+
+        for epoch in range(num_epochs):
+            cur_epoch_losses = {
+                'total_loss': 0,
+                'recon_loss': 0,
+                'recon_loss_eq': 0,
+                'R_smooth_loss': 0,
+                'I_smooth_loss': 0,
+                'I_smooth_loss_delta': 0,
+                'relight_loss': 0,
+                'fourier_loss': 0,
+                'decom_loss': 0,
+                'relightNet_loss': 0,
+                'spectral_loss': 0
+                }
+            count = 0
+            for batch_id in range(num_batches):
+                batch_input_low = np.zeros((batch_size, patch_size, patch_size, self.input_channels), dtype=np.float32)
+                batch_input_high = np.zeros((batch_size, patch_size, patch_size, self.input_channels), dtype=np.float32)
+                batch_input_low_eq = np.zeros((batch_size, patch_size, patch_size, 1), dtype=np.float32)
+                
+                for i in range(batch_size):
+                    idx = (batch_id * batch_size + i) % len(train_low_data)
+                    h, w, _ = train_low_data[idx].shape
+                    x = np.random.randint(0, h - patch_size)
+                    y = np.random.randint(0, w - patch_size)
+                    rand_mode = np.random.randint(0, 8)
+                    low_patch = data_augmentation(train_low_data[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
+                    high_patch = data_augmentation(train_high_data[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
+                    low_eq_patch = data_augmentation(train_low_data_eq[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
+                    batch_input_low[i] = low_patch
+                    batch_input_high[i] = high_patch
+                    batch_input_low_eq[i] = low_eq_patch
+                
+                batch_input_low = torch.from_numpy(batch_input_low).permute(0, 3, 1, 2).to(self.device)
+                batch_input_high = torch.from_numpy(batch_input_high).permute(0, 3, 1, 2).to(self.device)
+                batch_input_low_eq = torch.from_numpy(batch_input_low_eq).permute(0, 3, 1, 2).to(self.device)
+                self.optimizer.zero_grad()
+                loss, batch_losses = self.compute_loss(batch_input_low, batch_input_high, batch_input_low_eq)
+                loss.backward()
+                self.optimizer.step()
+                self.accumulate_loss_dict(cur_epoch_losses, batch_losses)
+                count += 1
+                print(f"Epoch [{epoch+1}/{num_epochs}] Batch [{batch_id+1}/{num_batches}] Loss: {loss.item():.6f}")
+                iter_num += 1
+            
+            self.append_to_loss_dict(cur_epoch_losses, count)
+            
+            avg_epoch_loss = cur_epoch_losses['total_loss'] / count if count > 0 else 0
+            if (epoch + 1) % plot_every_epoch == 0:
+                self.plot_loss_curve(os.path.join(eval_result_dir, 'loss_curves_combined.png'))
+            
+            if (epoch + 1) % eval_every_epoch == 0:
+                self.save_checkpoint(os.path.join(ckpt_dir, f"model_epoch_{epoch+1}.pth"), epoch+1)
+                self.save_checkpoint(os.path.join(ckpt_dir, "model_epoch_latest.pth"), epoch+1)
+            
+            print(f"Epoch [{epoch+1}/{num_epochs}] Average Loss: {avg_epoch_loss:.6f}")
+
+            mlflow.log_metrics(cur_epoch_losses, step=epoch)
+        
+        #mlflow.pytorch.log_model(self, "model")
+        mlflow.log_param('model_path', os.path.normpath(os.path.join(ckpt_dir, "model_epoch_latest.pth")))
+    
+    def test_model(self, model_dir, test_low_data, test_low_data_names, save_dir):
+        self.load_checkpoint(os.path.join(model_dir, 'model_epoch_latest.pth'))
+        self.eval()
+        total_run_time = 0.0
+        with torch.no_grad():
+            for idx in range(len(test_low_data)):
+                filename = os.path.basename(test_low_data_names[idx])
+                print(f'Processing {filename}')
+                
+                low_im = test_low_data[idx]
+                input_tensor = torch.from_numpy(low_im).unsqueeze(0).permute(0, 3, 1, 2).to(self.device)
+                start_time = time.time()
+                R_low, I_low, I_delta, S = self.forward(input_tensor)
+                run_time = time.time() - start_time
+                total_run_time += run_time
+                S_np = S.squeeze(0).permute(1, 2, 0).cpu().numpy()
+
+                save_hsi(os.path.join(save_dir, filename), S_np)
+                print(f"Processed {filename} in {run_time:.4f} seconds.")
+            avg_run_time = total_run_time / len(test_low_data) if len(test_low_data) > 0 else 0
+            print(f"Average run time: {avg_run_time:.4f} seconds.")
     
     def compute_gradients(self, img):
         grad_x = torch.abs(img[:, :, :, 1:] - img[:, :, :, :-1])
@@ -281,86 +410,7 @@ class LowLightEnhance(nn.Module):
             'spectral_loss': spectral_loss.item()
         }
         return loss_combined, losses
-    
-    def train_model(self, train_data_path, eval_data_path, batch_size, patch_size, num_epochs, start_lr, ckpt_dir, eval_result_dir, eval_every_epoch, plot_every_epoch=10):
-        ckpt_dir = os.path.join(ckpt_dir, 'Decom_' + self.time_stamp)
-        
-        os.makedirs(ckpt_dir, exist_ok=True)
-        os.makedirs(eval_result_dir, exist_ok=True)
-        train_files = sorted(glob(os.path.join(train_data_path, "*.*")))
-        train_low_data = []
-        train_high_data = []
-        train_low_data_eq = []
-        for file in train_files:
-            low_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=1.7410845, min_val=0.0708354)
-            train_low_data.append(low_im)
-            high_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=1.7410845, min_val=0.0708354)
-            train_high_data.append(high_im)
-            low_eq = pca_projection(low_im)
-            if low_eq.ndim == 2:
-                low_eq = low_eq[:, :, None]
-            train_low_data_eq.append(low_eq)
-        eval_low_data = []
-        eval_files = sorted(glob(os.path.join(eval_data_path, "*.*")))
-        for file in eval_files:
-            eval_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=1.7410845, min_val=0.0708354)
-            eval_low_data.append(eval_im)
-        
-        num_batches = len(train_low_data) // batch_size
-        lr_schedule = [start_lr] * num_epochs
-        iter_num = 0
-        for epoch in range(num_epochs):
-            cur_epoch_losses = {
-                'total_loss': 0,
-                'recon_loss': 0,
-                'recon_loss_eq': 0,
-                'R_smooth_loss': 0,
-                'I_smooth_loss': 0,
-                'I_smooth_loss_delta': 0,
-                'relight_loss': 0,
-                'fourier_loss': 0,
-                'decom_loss': 0,
-                'relightNet_loss': 0,
-                'spectral_loss': 0
-                }
-            count = 0
-            for batch_id in range(num_batches):
-                batch_input_low = np.zeros((batch_size, patch_size, patch_size, self.input_channels), dtype=np.float32)
-                batch_input_high = np.zeros((batch_size, patch_size, patch_size, self.input_channels), dtype=np.float32)
-                batch_input_low_eq = np.zeros((batch_size, patch_size, patch_size, 1), dtype=np.float32)
-                for i in range(batch_size):
-                    idx = (batch_id * batch_size + i) % len(train_low_data)
-                    h, w, _ = train_low_data[idx].shape
-                    x = np.random.randint(0, h - patch_size)
-                    y = np.random.randint(0, w - patch_size)
-                    rand_mode = np.random.randint(0, 8)
-                    low_patch = data_augmentation(train_low_data[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
-                    high_patch = data_augmentation(train_high_data[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
-                    low_eq_patch = data_augmentation(train_low_data_eq[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
-                    batch_input_low[i] = low_patch
-                    batch_input_high[i] = high_patch
-                    batch_input_low_eq[i] = low_eq_patch
-                batch_input_low = torch.from_numpy(batch_input_low).permute(0, 3, 1, 2).to(self.device)
-                batch_input_high = torch.from_numpy(batch_input_high).permute(0, 3, 1, 2).to(self.device)
-                batch_input_low_eq = torch.from_numpy(batch_input_low_eq).permute(0, 3, 1, 2).to(self.device)
-                self.optimizer.zero_grad()
-                loss, batch_losses = self.compute_loss(batch_input_low, batch_input_high, batch_input_low_eq)
-                loss.backward()
-                self.optimizer.step()
-                self.accumulate_loss_dict(cur_epoch_losses, batch_losses)
-                count += 1
-                print(f"Epoch [{epoch+1}/{num_epochs}] Batch [{batch_id+1}/{num_batches}] Loss: {loss.item():.6f}")
-                iter_num += 1
-            self.append_to_loss_dict(cur_epoch_losses, count)
-            
-            avg_epoch_loss = cur_epoch_losses['total_loss'] / count if count > 0 else 0
-            if (epoch + 1) % plot_every_epoch == 0:
-                self.plot_loss_curve(os.path.join(eval_result_dir, 'loss_curves_combined.png'))
-            if (epoch + 1) % eval_every_epoch == 0:
-                self.save_checkpoint(os.path.join(ckpt_dir, f"model_epoch_{epoch+1}.pth"), epoch+1)
-                self.save_checkpoint(os.path.join(ckpt_dir, "model_epoch_latest.pth"), epoch+1)
-            print(f"Epoch [{epoch+1}/{num_epochs}] Average Loss: {avg_epoch_loss:.6f}")
-    
+
     def append_to_loss_dict(self, cur_epoch_losses, count):
         self.all_epoch_losses['total_loss'].append(cur_epoch_losses['total_loss'] / count if count > 0 else 0)
         self.all_epoch_losses['recon_loss'].append(cur_epoch_losses['recon_loss'] / count if count > 0 else 0)
@@ -400,29 +450,7 @@ class LowLightEnhance(nn.Module):
         self.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         print(f"Loaded checkpoint from {path}")
-    
-    def test_model(self, model_dir, test_low_data, test_low_data_names, save_dir):
-        self.load_checkpoint(os.path.join(model_dir, 'model_epoch_latest.pth'))
-        self.eval()
-        total_run_time = 0.0
-        with torch.no_grad():
-            for idx in range(len(test_low_data)):
-                filename = os.path.basename(test_low_data_names[idx])
-                print(f'Processing {filename}')
-                
-                low_im = test_low_data[idx]
-                input_tensor = torch.from_numpy(low_im).unsqueeze(0).permute(0, 3, 1, 2).to(self.device)
-                start_time = time.time()
-                R_low, I_low, I_delta, S = self.forward(input_tensor)
-                run_time = time.time() - start_time
-                total_run_time += run_time
-                S_np = S.squeeze(0).permute(1, 2, 0).cpu().numpy()
 
-                save_hsi(os.path.join(save_dir, filename), S_np)
-                print(f"Processed {filename} in {run_time:.4f} seconds.")
-            avg_run_time = total_run_time / len(test_low_data) if len(test_low_data) > 0 else 0
-            print(f"Average run time: {avg_run_time:.4f} seconds.")
-    
     def plot_loss_curve(self, save_path):
         """Plot and save all training loss curves with epoch numbers"""
         
