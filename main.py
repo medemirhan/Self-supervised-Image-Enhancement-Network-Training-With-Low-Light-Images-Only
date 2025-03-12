@@ -122,6 +122,12 @@ def main(args):
         mlflow.log_param('data_min', args.global_min)
         mlflow.log_param('data_max', args.global_max)
         mlflow.log_param('seed', args.seed_value)
+
+        mlflow.log_artifact('main.py')
+        mlflow.log_artifact('model.py')
+        mlflow.log_artifact('utils.py')
+        mlflow.log_artifact('metrics.py')
+        mlflow.log_artifact('main_args.py')
         
         if args.phase == 'train':
             mlflow.log_param('data_train', args.train_data)
