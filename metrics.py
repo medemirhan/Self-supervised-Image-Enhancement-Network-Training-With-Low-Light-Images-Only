@@ -7,6 +7,8 @@ from skimage.metrics import peak_signal_noise_ratio as psnr_skimage
 from skimage.metrics import structural_similarity as ssim_skimage
 import numpy as np
 import scipy.io as sio
+import matplotlib
+matplotlib.use('Agg')
 
 def psnr(input, target, data_range=None):
     return peak_signal_noise_ratio(input, target, data_range=data_range)
@@ -122,23 +124,23 @@ if __name__ == '__main__':
     normalLightMin = 0.0708354
     normalLightMax = 1.7410845
 
-    im_dir = 'D:/sslie/test_results_20250120_124743/temp1/*.mat'
+    im_dir = '../RetinexNet/test_results/*.mat'
     label_dir = '../PairLIE/data/label_ll'
 
-    '''avg_psnr, avg_ssim, avg_sam = calc_metrics(
+    avg_psnr, avg_ssim, avg_sam = calc_metrics(
         im_dir=os.path.normpath(im_dir),
         label_dir=os.path.normpath(label_dir),
         data_min=None,
         data_max=globalMax,
-        matKeyPrediction='ref',
+        matKeyPrediction='data',
         matKeyGt='data'
         )
 
     print(f'\n===> Avg.PSNR : {avg_psnr:.4f}')
     print(f'===> Avg.SSIM : {avg_ssim:.4f}')
-    print(f'===> Avg.SAM  : {avg_sam:.4f}')'''
+    print(f'===> Avg.SAM  : {avg_sam:.4f}')
     
-    psnr_vec, ssim_vec = single_img_bandwise_metrics(
+    '''psnr_vec, ssim_vec = single_img_bandwise_metrics(
         pred_path='C:/Users/medemirhan/Desktop/comparison/msr/5/buildingblock.mat',
         label_path='C:/Users/medemirhan/Desktop/n2n/PairLIE/data/label_ll/buildingblock.mat',
         data_min=None,
@@ -148,4 +150,4 @@ if __name__ == '__main__':
         )
     
     sio.savemat('./psnr_vec6.mat', {"data": np.array(psnr_vec)})
-    sio.savemat('./ssim_vec6.mat', {"data": np.array(ssim_vec)})
+    sio.savemat('./ssim_vec6.mat', {"data": np.array(ssim_vec)})'''
