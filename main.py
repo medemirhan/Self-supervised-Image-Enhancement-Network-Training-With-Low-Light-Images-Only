@@ -149,6 +149,11 @@ def main(args):
 if __name__ == '__main__':
     args = Struct()
 
+    indoor_min = 0.0708354
+    indoor_max = 1.6697606
+    outdoor_min = 0.1167562
+    outdoor_max = 1.7410845
+
     # Common args
     args.use_gpu = 1
     args.seed_value = 41
@@ -158,13 +163,22 @@ if __name__ == '__main__':
     args.timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
 
     # Data related args
+    args.dataset_type = 'indoor'
     args.mat_key = 'data'
-    args.channels = 64
-    #args.global_min = 0.
-    #args.global_max = 0.005019044472441
-    args.global_min = 0.0708354
-    args.global_max = 1.7410845
     args.normalization = 'global_normalization'
+    args.channels = 64
+
+    if args.dataset_type == 'indoor':
+        args.global_min = indoor_min
+        args.global_max = indoor_max
+    elif args.dataset_type == 'outdoor':
+        args.global_min = outdoor_min
+        args.global_max = outdoor_max
+    elif args.dataset_type == 'combined':
+        args.global_min = min(indoor_min, outdoor_min)
+        args.global_max = min(indoor_max, outdoor_max)
+    else:
+        raise NotImplementedError('Dataset type ' + args.dataset_type + ' is not implemented.')
 
     args.coeff_recon_loss_low = 10
     args.coeff_Ismooth_loss_low = 1

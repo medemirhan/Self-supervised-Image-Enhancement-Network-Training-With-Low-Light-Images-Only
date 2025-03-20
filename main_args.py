@@ -197,3 +197,7 @@ if __name__ == '__main__':
     args = parse_args()
     main(args)
     print("Job finished...")
+    '''
+    Sample Usage:
+        python main_args.py --model_name "baseline" --coeff_recon_loss_low 10 --coeff_Ismooth_loss_low 1 --coeff_recon_loss_low_eq 1 --coeff_R_low_loss_smooth 1 --coeff_relight_loss 0.2 --coeff_Ismooth_loss_delta 20 --coeff_fourier_loss 0.2 --coeff_spectral_loss 1
+    '''
