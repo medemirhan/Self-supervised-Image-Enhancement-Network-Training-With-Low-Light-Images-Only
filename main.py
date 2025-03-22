@@ -58,18 +58,6 @@ def eval_metrics(args):
         matKeyGt='data'
         )
 
-    if data_min == None:
-        strMin = str(data_min)
-    else:
-        strMin = f"{data_min:.3f}"
-
-    # Format the log entry
-    log_entry = f"min:{strMin}, max:{args.global_max:.3f}, mpsnr:{avg_psnr:.3f}, mssim:{avg_ssim:.3f}, msam:{avg_sam:.3f}\n"
-
-    '''with open(args.log_file_path, "a") as log_file:
-        # Write the log entry to the file
-        log_file.write(log_entry)'''
-
     mlflow.log_metric("PSNR_dB", avg_psnr.item())
     mlflow.log_metric("SSIM", avg_ssim.item())
     mlflow.log_metric("SAM", avg_sam.item())

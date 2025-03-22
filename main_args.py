@@ -16,14 +16,18 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Parse config from YAML and command-line.")
     parser.add_argument('--config', type=str, default='./config/config.yml')
     parser.add_argument('--model_name', type=str, default=None)
-    parser.add_argument('--coeff_recon_loss_low', type=float, default=None)
-    parser.add_argument('--coeff_Ismooth_loss_low', type=float, default=None)
-    parser.add_argument('--coeff_recon_loss_low_eq', type=float, default=None)
-    parser.add_argument('--coeff_R_low_loss_smooth', type=float, default=None)
-    parser.add_argument('--coeff_relight_loss', type=float, default=None)
-    parser.add_argument('--coeff_Ismooth_loss_delta', type=float, default=None)
-    parser.add_argument('--coeff_fourier_loss', type=float, default=None)
-    parser.add_argument('--coeff_spectral_loss', type=float, default=None)
+    parser.add_argument('--train_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/train')
+    parser.add_argument('--eval_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/eval')
+    parser.add_argument('--test_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/test')
+    parser.add_argument('--label_dir', type=str, default='../PairLIE/data/label_ll')
+    parser.add_argument('--coeff_recon_loss_low', type=float, default=10)
+    parser.add_argument('--coeff_Ismooth_loss_low', type=float, default=1)
+    parser.add_argument('--coeff_recon_loss_low_eq', type=float, default=1)
+    parser.add_argument('--coeff_R_low_loss_smooth', type=float, default=1)
+    parser.add_argument('--coeff_relight_loss', type=float, default=0.2)
+    parser.add_argument('--coeff_Ismooth_loss_delta', type=float, default=20)
+    parser.add_argument('--coeff_fourier_loss', type=float, default=0.2)
+    parser.add_argument('--coeff_spectral_loss', type=float, default=1)
 
     args = parser.parse_args()
     
@@ -99,18 +103,6 @@ def eval_metrics(args):
         matKeyPrediction='ref',
         matKeyGt='data'
         )
-
-    if data_min == None:
-        strMin = str(data_min)
-    else:
-        strMin = f"{data_min:.3f}"
-
-    # Format the log entry
-    log_entry = f"min:{strMin}, max:{args.global_max:.3f}, mpsnr:{avg_psnr:.3f}, mssim:{avg_ssim:.3f}, msam:{avg_sam:.3f}\n"
-
-    '''with open(args.log_file_path, "a") as log_file:
-        # Write the log entry to the file
-        log_file.write(log_entry)'''
 
     mlflow.log_metric("PSNR_dB", avg_psnr.item())
     mlflow.log_metric("SSIM", avg_ssim.item())
