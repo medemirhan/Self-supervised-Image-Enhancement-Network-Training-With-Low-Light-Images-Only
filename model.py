@@ -47,20 +47,26 @@ class DecomNet(nn.Module):
         self.recon = nn.Conv2d(channel, in_channels + 1, kernel_size, stride=1, padding=(kernel_size - 1) // 2)
         
     def forward(self, x):
-        # x: (N, in_channels, H, W)
-        conv0 = self.conv0(x)
-        shallow = self.shallow_conv(x)
-        conv1 = self.conv1(shallow)
-        conv2 = self.conv2(conv1)
-        conv3 = self.conv3(conv2)
-        deconv = self.deconv(conv3)
-        concat1 = torch.cat([deconv, conv1], dim=1)
-        conv5 = self.conv5(concat1)
-        concat2 = torch.cat([conv5, conv0], dim=1)
-        conv7 = self.conv7(concat2)
-        conv8 = self.recon(conv7)
-        R = torch.sigmoid(conv8[:, :self.in_channels, :, :])
-        L = torch.sigmoid(conv8[:, self.in_channels:, :, :])
+        # x: (B, in_channels, H, W)
+        conv0 = self.conv0(x) # conv0: (B, channel//2, H, W) 
+        shallow = self.shallow_conv(x) # shallow: (B, channel, H, W)
+        conv1 = self.conv1(shallow) # conv1: (B, channel, H, W)
+        conv2 = self.conv2(conv1) # conv2: (B, 2*channel, H/2, W/2)  [Downsampled by stride 2]
+        conv3 = self.conv3(conv2) # conv3: (B, 2*channel, H/2, W/2)
+        deconv = self.deconv(conv3) # deconv: (B, channel, H, W)  [Upsampled to original H, W]
+        
+        # First skip connection: fuse deconv and conv1
+        concat1 = torch.cat([deconv, conv1], dim=1) # concat1: (B, channel + channel, H, W) = (B, 2*channel, H, W)
+        conv5 = self.conv5(concat1) # conv5: (B, channel, H, W)
+        
+        # Second skip connection: fuse conv5 and conv0
+        concat2 = torch.cat([conv5, conv0], dim=1) # concat2: (B, channel + (channel//2), H, W)
+        conv7 = self.conv7(concat2) # conv7: (B, channel, H, W)
+        conv8 = self.recon(conv7) # conv8: (B, in_channels + 1, H, W)
+        
+        # Split the output into reflectance and illumination components
+        R = torch.sigmoid(conv8[:, :self.in_channels, :, :]) # R: (B, in_channels, H, W)
+        L = torch.sigmoid(conv8[:, self.in_channels:, :, :]) # L: (B, 1, H, W)
         return R, L
 
 class SEBlock(nn.Module):
@@ -135,24 +141,37 @@ class RelightNet(nn.Module):
         self.final_conv = nn.Conv2d(channel, 1, 3, stride=1, padding=1)
         
     def forward(self, I, R):
-        # I: illumination (N, 1, H, W); R: reflectance (N, in_channels, H, W)
-        x = torch.cat([R, I], dim=1)
-        conv0 = self.conv0(x)
-        conv1 = self.conv1(conv0)
-        conv2 = self.conv2(conv1)
-        conv3 = self.conv3(conv2)
-        conv3 = self.attn(conv3)
-        up1 = F.interpolate(conv3, size=conv2.shape[2:], mode='nearest')
-        deconv1 = self.deconv1(up1) + conv2
-        up2 = F.interpolate(deconv1, size=conv1.shape[2:], mode='nearest')
-        deconv2 = self.deconv2(up2) + conv1
-        up3 = F.interpolate(deconv2, size=conv0.shape[2:], mode='nearest')
-        deconv3 = self.deconv3(up3) + conv0
-        deconv1_resize = F.interpolate(deconv1, size=deconv3.shape[2:], mode='nearest')
-        deconv2_resize = F.interpolate(deconv2, size=deconv3.shape[2:], mode='nearest')
-        feature_gather = torch.cat([deconv1_resize, deconv2_resize, deconv3], dim=1)
-        feature_fusion = self.feature_fusion(feature_gather)
-        output = self.final_conv(feature_fusion)
+        # I: illumination (B, 1, H, W)
+        # R: reflectance (B, in_channels, H, W)
+        x = torch.cat([R, I], dim=1) # x: (B, in_channels + 1, H, W)
+        conv0 = self.conv0(x) # conv0: (B, channel, H, W)
+        conv1 = self.conv1(conv0) # conv1: (B, channel, H/2, W/2)  [Downsampled]
+        conv2 = self.conv2(conv1) # conv2: (B, channel, H/4, W/4)  [Downsampled]
+        conv3 = self.conv3(conv2) # conv3: (B, channel, H/8, W/8)  [Downsampled]
+        
+        # Attention block
+        conv3 = self.attn(conv3) # conv3 (after attention): (B, channel, H/8, W/8)
+        
+        # Upsample and add skip connection from conv2
+        up1 = F.interpolate(conv3, size=conv2.shape[2:], mode='nearest') # up1: (B, channel, H/4, W/4)
+        deconv1 = self.deconv1(up1) + conv2 # deconv1: (B, channel, H/4, W/4)
+        
+        # Upsample and add skip connection from conv1
+        up2 = F.interpolate(deconv1, size=conv1.shape[2:], mode='nearest') # up2: (B, channel, H/2, W/2)
+        deconv2 = self.deconv2(up2) + conv1 # deconv2: (B, channel, H/2, W/2)
+        
+        # Upsample and add skip connection from conv0
+        up3 = F.interpolate(deconv2, size=conv0.shape[2:], mode='nearest') # up3: (B, channel, H, W)
+        deconv3 = self.deconv3(up3) + conv0 # deconv3: (B, channel, H, W)
+        
+        # Resize deconv1 and deconv2 to match deconv3's spatial size for gathering
+        deconv1_resize = F.interpolate(deconv1, size=deconv3.shape[2:], mode='nearest') # deconv1_resize: (B, channel, H, W)
+        deconv2_resize = F.interpolate(deconv2, size=deconv3.shape[2:], mode='nearest') # deconv2_resize: (B, channel, H, W)
+        
+        # Concatenate features along channel dimension
+        feature_gather = torch.cat([deconv1_resize, deconv2_resize, deconv3], dim=1) # feature_gather: (B, 3 * channel, H, W)
+        feature_fusion = self.feature_fusion(feature_gather) # feature_fusion: (B, channel, H, W)
+        output = self.final_conv(feature_fusion) # output: (B, 1, H, W)
         return output
 
 class LowLightEnhance(nn.Module):

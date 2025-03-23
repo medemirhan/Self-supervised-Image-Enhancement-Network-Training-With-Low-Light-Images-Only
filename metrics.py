@@ -118,13 +118,13 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
 if __name__ == '__main__':
 
     globalMin = 0.0708354
-    globalMax = 1.7410845
+    globalMax = 1.6697606
     lowLightMin = 0.0708354
     lowLightMax = 0.2173913
     normalLightMin = 0.0708354
     normalLightMax = 1.7410845
 
-    im_dir = '../RetinexNet/test_results/*.mat'
+    im_dir = '../denoising/LRTDTV/denoised/*.mat'
     label_dir = '../PairLIE/data/label_ll'
 
     avg_psnr, avg_ssim, avg_sam = calc_metrics(
