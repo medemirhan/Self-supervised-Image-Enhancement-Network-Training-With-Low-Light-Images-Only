@@ -42,7 +42,9 @@ def test(model, args):
         model_dir=args.test_model_dir,
         test_low_data=test_low_data, 
         test_low_data_names=test_low_data_name, 
-        save_dir=args.test_result_dir, 
+        save_dir=args.test_result_dir,
+        save_reflectance=args.save_reflectance,
+        save_illumination=args.save_illumination
         )
 
 def eval_metrics(args):
@@ -149,6 +151,8 @@ if __name__ == '__main__':
     args.gpu_mem = float(0.8)
     args.decom = 0
     args.timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
+    args.save_reflectance = False
+    args.save_illumination = False
 
     # Data related args
     args.dataset_type = 'indoor'
