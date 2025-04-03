@@ -161,7 +161,7 @@ def main(args):
         mlflow.log_artifact('utils.py')
         mlflow.log_artifact('metrics.py')
         mlflow.log_artifact('main_args.py')
-        mlflow.log_artifact('./config/config.yml')
+        mlflow.log_artifact(args.config)
         
         if args.phase == 'train':
             mlflow.log_param('data_train', args.train_data)

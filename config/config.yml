@@ -17,8 +17,8 @@ test_data: "../PairLIE/data/hsi_dataset_indoor_only/test"
 label_dir: "../PairLIE/data/label_ll"
 phase: "train_and_test"
 epoch: 400
-eval_every_epoch: 100
-plot_every_epoch: 100
+eval_every_epoch: 200
+plot_every_epoch: 200
 coeff_recon_loss_low: 10
 coeff_Ismooth_loss_low: 1
 coeff_recon_loss_low_eq: 1
