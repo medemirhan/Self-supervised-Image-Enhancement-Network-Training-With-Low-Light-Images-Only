@@ -84,8 +84,8 @@ def main(args):
         time_stamp=args.timestamp,
         coeff_recon_loss_low=args.coeff_recon_loss_low, 
         coeff_Ismooth_loss_low=args.coeff_Ismooth_loss_low,
-        coeff_recon_loss_low_eq=args.coeff_recon_loss_low_eq,
-        coeff_R_low_loss_smooth=args.coeff_R_low_loss_smooth,
+        coeff_r_consistency_loss=args.coeff_r_consistency_loss,
+        coeff_str_aware_loss=args.coeff_str_aware_loss,
         coeff_relight_loss=args.coeff_relight_loss,
         coeff_Ismooth_loss_delta=args.coeff_Ismooth_loss_delta,
         coeff_fourier_loss=args.coeff_fourier_loss,
@@ -175,8 +175,8 @@ if __name__ == '__main__':
 
     args.coeff_recon_loss_low = 10
     args.coeff_Ismooth_loss_low = 1
-    args.coeff_recon_loss_low_eq = 1
-    args.coeff_R_low_loss_smooth = 1
+    args.coeff_r_consistency_loss = 1
+    args.coeff_str_aware_loss = 1
     args.coeff_relight_loss = 0.2
     args.coeff_Ismooth_loss_delta = 20
     args.coeff_fourier_loss = 0.2
@@ -194,8 +194,8 @@ if __name__ == '__main__':
     args.model_name = 'torch_exp'
     args.phase = 'train_and_test'
     args.epoch = 400
-    args.eval_every_epoch = 100
-    args.plot_every_epoch = 100
+    args.eval_every_epoch = 200
+    args.plot_every_epoch = 200
 
     if args.phase == 'test':
         args.timestamp = '' # enter timestamp manually

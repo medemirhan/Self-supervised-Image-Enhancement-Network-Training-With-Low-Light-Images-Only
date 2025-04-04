@@ -176,8 +176,8 @@ class RelightNet(nn.Module):
 
 class LowLightEnhance(nn.Module):
     def __init__(self, input_channels=64, lr=1e-3, time_stamp=None, 
-                 coeff_recon_loss_low=10, coeff_Ismooth_loss_low=1, coeff_recon_loss_low_eq=1,
-                 coeff_R_low_loss_smooth=1, coeff_relight_loss=0.2, coeff_Ismooth_loss_delta=20,
+                 coeff_recon_loss_low=10, coeff_Ismooth_loss_low=1, coeff_r_consistency_loss=1,
+                 coeff_str_aware_loss=1, coeff_relight_loss=0.2, coeff_Ismooth_loss_delta=20,
                  coeff_fourier_loss=0.2, coeff_spectral_loss=1, device=torch.device("cpu")):
         super(LowLightEnhance, self).__init__()
         self.input_channels = input_channels
@@ -185,8 +185,8 @@ class LowLightEnhance(nn.Module):
         self.time_stamp = time_stamp
         self.coeff_recon_loss_low = coeff_recon_loss_low
         self.coeff_Ismooth_loss_low = coeff_Ismooth_loss_low
-        self.coeff_recon_loss_low_eq = coeff_recon_loss_low_eq
-        self.coeff_R_low_loss_smooth = coeff_R_low_loss_smooth
+        self.coeff_r_consistency_loss = coeff_r_consistency_loss
+        self.coeff_str_aware_loss = coeff_str_aware_loss
         self.coeff_relight_loss = coeff_relight_loss
         self.coeff_Ismooth_loss_delta = coeff_Ismooth_loss_delta
         self.coeff_fourier_loss = coeff_fourier_loss
@@ -198,7 +198,7 @@ class LowLightEnhance(nn.Module):
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         
-        self.all_epoch_losses = {'total_loss': [], 'recon_loss': [], 'recon_loss_eq': [], 'R_smooth_loss': [],
+        self.all_epoch_losses = {'total_loss': [], 'recon_loss': [], 'r_consistency_loss': [], 'str_aware_loss': [],
                              'I_smooth_loss': [], 'I_smooth_loss_delta': [], 'relight_loss': [],
                              'fourier_loss': [], 'decom_loss': [], 'relightNet_loss': [], 'spectral_loss': []}
     
@@ -256,8 +256,8 @@ class LowLightEnhance(nn.Module):
             cur_epoch_losses = {
                 'total_loss': 0,
                 'recon_loss': 0,
-                'recon_loss_eq': 0,
-                'R_smooth_loss': 0,
+                'r_consistency_loss': 0,
+                'str_aware_loss': 0,
                 'I_smooth_loss': 0,
                 'I_smooth_loss_delta': 0,
                 'relight_loss': 0,
@@ -388,17 +388,110 @@ class LowLightEnhance(nn.Module):
         pc1 = pca_projection(R_np)
         pc1 = torch.from_numpy(pc1).unsqueeze(0).permute(0, 3, 1, 2).to(R.device).float()
         return pc1
-    
+
+    def gradient_x(self, x):
+        # Computes forward differences along width dimension
+        return x[..., :, 1:] - x[..., :, :-1]
+
+    def gradient_y(self, x):
+        # Computes forward differences along height dimension
+        return x[..., 1:, :] - x[..., :-1, :]
+
+    def structure_aware_loss(self, S, R, I, R_enh, alpha=1.0, beta=1.0, lambda_I=1.0, lambda_R=1.0):
+        """
+        Structure-aware loss that combines edge-aware illumination smoothness and reflectance fidelity.
+        
+        Parameters:
+            S (torch.Tensor): Original low-light hyperspectral image, shape (B, C, H, W).
+            R (torch.Tensor): Predicted reflectance, shape (B, C, H, W).
+            I (torch.Tensor): Predicted illumination, shape (B, 1, H, W).
+            alpha (float): Weighting parameter for edge-aware weighting.
+            beta (float): Weight for the gradient term in the reflectance loss.
+            lambda_I (float): Weight for the illumination loss.
+            lambda_R (float): Weight for the reflectance fidelity loss.
+        
+        Returns:
+            torch.Tensor: The total loss.
+        """
+        
+        # --------------------------
+        # 1. Edge-Aware Illumination Loss
+        # --------------------------
+        # Compute gradients of reflectance R (for weight computation)
+        grad_R_x = self.gradient_x(R)  # shape: (B, C, H, W-1)
+        grad_R_y = self.gradient_y(R)  # shape: (B, C, H-1, W)
+        
+        # Average absolute gradients over channels to get a per-pixel weight
+        # Resulting shapes: (B, 1, H, W-1) and (B, 1, H-1, W)
+        weight_x = torch.exp(-alpha * grad_R_x.abs().mean(dim=1, keepdim=True))
+        weight_y = torch.exp(-alpha * grad_R_y.abs().mean(dim=1, keepdim=True))
+        
+        # Compute gradients of illumination I
+        grad_I_x = self.gradient_x(I)  # shape: (B, 1, H, W-1)
+        grad_I_y = self.gradient_y(I)  # shape: (B, 1, H-1, W)
+        
+        # Compute weighted L1 loss on illumination gradients
+        loss_I_x = torch.mean(weight_x * grad_I_x.abs())
+        loss_I_y = torch.mean(weight_y * grad_I_y.abs())
+        loss_I = loss_I_x + loss_I_y
+
+        # --------------------------
+        # 2. Reflectance Fidelity Loss
+        # --------------------------
+        # Pixel-wise L1 loss between reflectance and original input
+        loss_R1 = torch.mean(torch.abs(R - S))
+        
+        # Compute gradients for reflectance R and input S
+        grad_R_S_x = self.gradient_x(R)
+        grad_R_S_y = self.gradient_y(R)
+        grad_S_x = self.gradient_x(S)
+        grad_S_y = self.gradient_y(S)
+        
+        # L1 loss on the difference of gradients
+        loss_R2_x = torch.mean(torch.abs(grad_R_S_x - grad_S_x))
+        loss_R2_y = torch.mean(torch.abs(grad_R_S_y - grad_S_y))
+        loss_R2 = loss_R2_x + loss_R2_y
+        
+        loss_R = loss_R1 + beta * loss_R2
+
+        '''# --------------------------
+        # 2. Reflectance Fidelity Loss
+        # --------------------------
+        # Pixel-wise L1 loss between reflectance and original input
+        loss_R1 = torch.mean(torch.abs(R - R_enh))
+        
+        # Compute gradients for reflectance R and input S
+        grad_R_S_x = self.gradient_x(R)
+        grad_R_S_y = self.gradient_y(R)
+        grad_S_x = self.gradient_x(R_enh)
+        grad_S_y = self.gradient_y(R_enh)
+        
+        # L1 loss on the difference of gradients
+        loss_R2_x = torch.mean(torch.abs(grad_R_S_x - grad_S_x))
+        loss_R2_y = torch.mean(torch.abs(grad_R_S_y - grad_S_y))
+        loss_R2 = loss_R2_x + loss_R2_y
+        
+        loss_R = loss_R1 + beta * loss_R2'''
+
+        # --------------------------
+        # 3. Total Loss
+        # --------------------------
+        total_loss = lambda_I * loss_I + lambda_R * loss_R
+        return total_loss
+
     def compute_loss(self, input_low, input_high, input_low_eq):
         R_low, I_low, I_delta, S = self.forward(input_low)
+        R_enh, I_enh = self.decom_net(S)
         recon_loss = torch.mean(torch.abs(R_low * I_low - input_high))
 
         R_low_pca = self.pca_projection_loss(R_low)
-        recon_loss_eq = torch.mean(torch.abs(R_low_pca - input_low_eq))
+        #recon_loss_eq = torch.mean(torch.abs(R_low_pca - input_low_eq))
+        r_consistency_loss = torch.mean(torch.abs(R_low - R_enh))
 
         R_gray = torch.mean(R_low, dim=1, keepdim=True)
-        R_smooth_loss = torch.mean(torch.abs(self.compute_gradients(R_gray)[0])) + torch.mean(torch.abs(self.compute_gradients(R_gray)[1]))
-        
+        #R_smooth_loss = torch.mean(torch.abs(self.compute_gradients(R_gray)[0])) + torch.mean(torch.abs(self.compute_gradients(R_gray)[1]))
+        str_aware_loss = self.structure_aware_loss(input_low, R_low, I_low, R_enh, alpha=1.0, beta=0.5, lambda_I=1.0, lambda_R=1.0)
+
         I_smooth_loss = self.smooth_loss(I_low, R_gray)
         
         I_smooth_loss_delta = self.smooth_loss(I_delta, R_low)
@@ -411,14 +504,14 @@ class LowLightEnhance(nn.Module):
         
         loss_Decom = (self.coeff_recon_loss_low * recon_loss + 
                       self.coeff_Ismooth_loss_low * I_smooth_loss + 
-                      self.coeff_recon_loss_low_eq * recon_loss_eq + 
-                      self.coeff_R_low_loss_smooth * R_smooth_loss)
+                      self.coeff_r_consistency_loss * r_consistency_loss + 
+                      self.coeff_str_aware_loss * str_aware_loss)
         loss_Relight = (self.coeff_relight_loss * relight_loss + 
                         self.coeff_Ismooth_loss_delta * I_smooth_loss_delta)
         loss_combined = (self.coeff_recon_loss_low * recon_loss + 
                          self.coeff_Ismooth_loss_low * I_smooth_loss + 
-                         self.coeff_recon_loss_low_eq * recon_loss_eq + 
-                         self.coeff_R_low_loss_smooth * R_smooth_loss +
+                         self.coeff_r_consistency_loss * r_consistency_loss + 
+                         self.coeff_str_aware_loss * str_aware_loss +
                          self.coeff_relight_loss * relight_loss + 
                          self.coeff_Ismooth_loss_delta * I_smooth_loss_delta + 
                          self.coeff_fourier_loss * fourier_loss + 
@@ -426,8 +519,8 @@ class LowLightEnhance(nn.Module):
         losses = {
             'total_loss': loss_combined.item(),
             'recon_loss': recon_loss.item(),
-            'recon_loss_eq': recon_loss_eq.item(),
-            'R_smooth_loss': R_smooth_loss.item(),
+            'r_consistency_loss': r_consistency_loss.item(),
+            'str_aware_loss': str_aware_loss.item(),
             'I_smooth_loss': I_smooth_loss.item(),
             'I_smooth_loss_delta': I_smooth_loss_delta.item(),
             'relight_loss': relight_loss.item(),
@@ -441,8 +534,8 @@ class LowLightEnhance(nn.Module):
     def append_to_loss_dict(self, cur_epoch_losses, count):
         self.all_epoch_losses['total_loss'].append(cur_epoch_losses['total_loss'] / count if count > 0 else 0)
         self.all_epoch_losses['recon_loss'].append(cur_epoch_losses['recon_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['recon_loss_eq'].append(cur_epoch_losses['recon_loss_eq'] / count if count > 0 else 0)
-        self.all_epoch_losses['R_smooth_loss'].append(cur_epoch_losses['R_smooth_loss'] / count if count > 0 else 0)
+        self.all_epoch_losses['r_consistency_loss'].append(cur_epoch_losses['r_consistency_loss'] / count if count > 0 else 0)
+        self.all_epoch_losses['str_aware_loss'].append(cur_epoch_losses['str_aware_loss'] / count if count > 0 else 0)
         self.all_epoch_losses['I_smooth_loss'].append(cur_epoch_losses['I_smooth_loss'] / count if count > 0 else 0)
         self.all_epoch_losses['I_smooth_loss_delta'].append(cur_epoch_losses['I_smooth_loss_delta'] / count if count > 0 else 0)
         self.all_epoch_losses['relight_loss'].append(cur_epoch_losses['relight_loss'] / count if count > 0 else 0)
@@ -454,8 +547,8 @@ class LowLightEnhance(nn.Module):
     def accumulate_loss_dict(self, cur_epoch_losses, batch_losses):
         cur_epoch_losses['total_loss'] += batch_losses['total_loss']
         cur_epoch_losses['recon_loss'] += batch_losses['recon_loss']
-        cur_epoch_losses['recon_loss_eq'] += batch_losses['recon_loss_eq']
-        cur_epoch_losses['R_smooth_loss'] += batch_losses['R_smooth_loss']
+        cur_epoch_losses['r_consistency_loss'] += batch_losses['r_consistency_loss']
+        cur_epoch_losses['str_aware_loss'] += batch_losses['str_aware_loss']
         cur_epoch_losses['I_smooth_loss'] += batch_losses['I_smooth_loss']
         cur_epoch_losses['I_smooth_loss_delta'] += batch_losses['I_smooth_loss_delta']
         cur_epoch_losses['relight_loss'] += batch_losses['relight_loss']
@@ -503,16 +596,16 @@ class LowLightEnhance(nn.Module):
         plt.legend()
         
         plt.subplot(3, 4, 3)
-        plt.plot(epochs, self.all_epoch_losses['recon_loss_eq'], 'b-', label='Eq Reconstruction Loss')
-        plt.title('Equalization Reconstruction Loss')
+        plt.plot(epochs, self.all_epoch_losses['r_consistency_loss'], 'b-', label='R Consistency Loss')
+        plt.title('R Consistency Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
         plt.legend()
         
         plt.subplot(3, 4, 4)
-        plt.plot(epochs, self.all_epoch_losses['R_smooth_loss'], 'g-', label='R Smoothness Loss')
-        plt.title('R Smoothness Loss')
+        plt.plot(epochs, self.all_epoch_losses['str_aware_loss'], 'g-', label='Str Aware Loss')
+        plt.title('Structure Aware Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
