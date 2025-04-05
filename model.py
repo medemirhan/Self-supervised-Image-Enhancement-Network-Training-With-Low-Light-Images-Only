@@ -345,15 +345,13 @@ class LowLightEnhance(nn.Module):
                 print(f"Processed {filename} in {run_time:.4f} seconds.")
             avg_run_time = total_run_time / len(test_low_data) if len(test_low_data) > 0 else 0
             print(f"Average run time: {avg_run_time:.4f} seconds.")
-    
-    def compute_gradients(self, img):
-        grad_x = torch.abs(img[:, :, :, 1:] - img[:, :, :, :-1])
-        grad_y = torch.abs(img[:, :, 1:, :] - img[:, :, :-1, :])
-        return grad_x, grad_y
-    
+
     def smooth_loss(self, I, R):
-        grad_Ix, grad_Iy = self.compute_gradients(I)
-        grad_Rx, grad_Ry = self.compute_gradients(R)
+        grad_Ix = torch.abs(self.gradient_x(I))
+        grad_Iy = torch.abs(self.gradient_y(I))
+        grad_Rx = torch.abs(self.gradient_x(R))
+        grad_Ry = torch.abs(self.gradient_y(R))
+
         loss = torch.mean(grad_Ix * torch.exp(-10 * grad_Rx)) + torch.mean(grad_Iy * torch.exp(-10 * grad_Ry))
         return loss
     
