@@ -126,14 +126,11 @@ def main(args):
         lr_update_factor=args.lr_update_factor,
         lr_update_period=args.lr_update_period,
         time_stamp=args.timestamp,
-        coeff_recon_loss_low=args.coeff_recon_loss_low, 
-        coeff_Ismooth_loss_low=args.coeff_Ismooth_loss_low,
-        coeff_r_consistency_loss=args.coeff_r_consistency_loss,
-        coeff_str_aware_loss=args.coeff_str_aware_loss,
-        coeff_relight_loss=args.coeff_relight_loss,
-        coeff_Ismooth_loss_delta=args.coeff_Ismooth_loss_delta,
-        coeff_fourier_loss=args.coeff_fourier_loss,
-        coeff_spectral_loss=args.coeff_spectral_loss,
+        c_loss_reconstruction=args.c_loss_reconstruction,
+        c_loss_str_awareness=args.c_loss_str_awareness,
+        c_loss_i_smooth_delta=args.c_loss_i_smooth_delta,
+        c_loss_fourier=args.c_loss_fourier,
+        c_loss_spectral_cons=args.c_loss_spectral_cons,
         device=device
     )
     

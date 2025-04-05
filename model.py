@@ -176,21 +176,17 @@ class RelightNet(nn.Module):
 
 class LowLightEnhance(nn.Module):
     def __init__(self, input_channels=64, lr=1e-3, lr_update_factor=1, lr_update_period=None, time_stamp=None, 
-                 coeff_recon_loss_low=10, coeff_Ismooth_loss_low=1, coeff_r_consistency_loss=1,
-                 coeff_str_aware_loss=1, coeff_relight_loss=0.2, coeff_Ismooth_loss_delta=20,
-                 coeff_fourier_loss=0.2, coeff_spectral_loss=1, device=torch.device("cpu")):
+                 c_loss_reconstruction=10, c_loss_str_awareness=1, c_loss_i_smooth_delta=20,
+                 c_loss_fourier=0.2, c_loss_spectral_cons=1, device=torch.device("cpu")):
         super(LowLightEnhance, self).__init__()
         self.input_channels = input_channels
         self.device = device
         self.time_stamp = time_stamp
-        self.coeff_recon_loss_low = coeff_recon_loss_low
-        self.coeff_Ismooth_loss_low = coeff_Ismooth_loss_low
-        self.coeff_r_consistency_loss = coeff_r_consistency_loss
-        self.coeff_str_aware_loss = coeff_str_aware_loss
-        self.coeff_relight_loss = coeff_relight_loss
-        self.coeff_Ismooth_loss_delta = coeff_Ismooth_loss_delta
-        self.coeff_fourier_loss = coeff_fourier_loss
-        self.coeff_spectral_loss = coeff_spectral_loss
+        self.c_loss_reconstruction = c_loss_reconstruction
+        self.c_loss_str_awareness = c_loss_str_awareness
+        self.c_loss_i_smooth_delta = c_loss_i_smooth_delta
+        self.c_loss_fourier = c_loss_fourier
+        self.c_loss_spectral_cons = c_loss_spectral_cons
         self.lr = lr
         self.lr_update_factor = lr_update_factor
         self.lr_update_period = lr_update_period
@@ -207,10 +203,15 @@ class LowLightEnhance(nn.Module):
         if self.adaptive_lr:
             self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.lr_update_period, gamma=self.lr_update_factor)
         
-        self.all_epoch_losses = {'total_loss': [], 'recon_loss': [], 'r_consistency_loss': [], 'str_aware_loss': [],
-                             'I_smooth_loss': [], 'I_smooth_loss_delta': [], 'relight_loss': [],
-                             'fourier_loss': [], 'decom_loss': [], 'relightNet_loss': [], 'spectral_loss': []}
-    
+        self.all_epoch_losses = {
+            'total_loss': [],
+            'L_reconstruction': [],
+            'L_str_awareness': [],
+            'L_I_smooth_delta': [],
+            'L_fourier': [],
+            'L_spectral_cons': []
+            }
+
     def forward(self, input_low):
         # input_low: (N, input_channels, H, W)
         R_low, I_low = self.decom_net(input_low)
@@ -226,7 +227,6 @@ class LowLightEnhance(nn.Module):
         train_files = sorted(glob(os.path.join(train_data_path, "*.*")))
         train_low_data = []
         train_high_data = []
-        train_low_data_eq = []
         for file in train_files:
             low_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=max_val, min_val=min_val)
             train_low_data.append(low_im)
@@ -235,7 +235,6 @@ class LowLightEnhance(nn.Module):
             low_eq = pca_projection(low_im)
             if low_eq.ndim == 2:
                 low_eq = low_eq[:, :, None]
-            train_low_data_eq.append(low_eq)
         eval_low_data = []
         eval_files = sorted(glob(os.path.join(eval_data_path, "*.*")))
         for file in eval_files:
@@ -264,22 +263,16 @@ class LowLightEnhance(nn.Module):
         for epoch in range(num_epochs):
             cur_epoch_losses = {
                 'total_loss': 0,
-                'recon_loss': 0,
-                'r_consistency_loss': 0,
-                'str_aware_loss': 0,
-                'I_smooth_loss': 0,
-                'I_smooth_loss_delta': 0,
-                'relight_loss': 0,
-                'fourier_loss': 0,
-                'decom_loss': 0,
-                'relightNet_loss': 0,
-                'spectral_loss': 0
+                'L_reconstruction': 0,
+                'L_str_awareness': 0,
+                'L_I_smooth_delta': 0,
+                'L_fourier': 0,
+                'L_spectral_cons': 0
                 }
             count = 0
             for batch_id in range(num_batches):
                 batch_input_low = np.zeros((batch_size, patch_size, patch_size, self.input_channels), dtype=np.float32)
                 batch_input_high = np.zeros((batch_size, patch_size, patch_size, self.input_channels), dtype=np.float32)
-                batch_input_low_eq = np.zeros((batch_size, patch_size, patch_size, 1), dtype=np.float32)
                 
                 for i in range(batch_size):
                     idx = (batch_id * batch_size + i) % len(train_low_data)
@@ -289,16 +282,13 @@ class LowLightEnhance(nn.Module):
                     rand_mode = np.random.randint(0, 8)
                     low_patch = data_augmentation(train_low_data[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
                     high_patch = data_augmentation(train_high_data[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
-                    low_eq_patch = data_augmentation(train_low_data_eq[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
                     batch_input_low[i] = low_patch
                     batch_input_high[i] = high_patch
-                    batch_input_low_eq[i] = low_eq_patch
                 
                 batch_input_low = torch.from_numpy(batch_input_low).permute(0, 3, 1, 2).to(self.device)
                 batch_input_high = torch.from_numpy(batch_input_high).permute(0, 3, 1, 2).to(self.device)
-                batch_input_low_eq = torch.from_numpy(batch_input_low_eq).permute(0, 3, 1, 2).to(self.device)
                 self.optimizer.zero_grad()
-                loss, batch_losses = self.compute_loss(batch_input_low, batch_input_high, batch_input_low_eq)
+                loss, batch_losses = self.compute_loss(batch_input_low, batch_input_high)
                 loss.backward()
                 self.optimizer.step()
                 self.accumulate_loss_dict(cur_epoch_losses, batch_losses)
@@ -324,7 +314,6 @@ class LowLightEnhance(nn.Module):
 
             mlflow.log_metrics(cur_epoch_losses, step=epoch)
         
-        #mlflow.pytorch.log_model(self, "model")
         mlflow.log_param('model_path', os.path.normpath(os.path.join(ckpt_dir, "model_epoch_latest.pth")))
     
     def test_model(self, model_dir, test_low_data, test_low_data_names, save_dir, save_reflectance=False, save_illumination=False):
@@ -394,13 +383,6 @@ class LowLightEnhance(nn.Module):
         else:
             loss = torch.mean(spectral_diff ** 2)
         return loss
-    
-    def pca_projection_loss(self, R):
-        # Assume batch size 1; convert tensor to numpy (H, W, C)
-        R_np = R.detach().cpu().numpy()[0].transpose(1, 2, 0)
-        pc1 = pca_projection(R_np)
-        pc1 = torch.from_numpy(pc1).unsqueeze(0).permute(0, 3, 1, 2).to(R.device).float()
-        return pc1
 
     def gradient_x(self, x):
         # Computes forward differences along width dimension
@@ -410,12 +392,11 @@ class LowLightEnhance(nn.Module):
         # Computes forward differences along height dimension
         return x[..., 1:, :] - x[..., :-1, :]
 
-    def structure_aware_loss(self, S, R, I, R_enh, alpha=1.0, beta=1.0, lambda_I=1.0, lambda_R=1.0):
+    def structure_aware_loss(self, R, I, R_enh, alpha=1.0, beta=1.0, lambda_I=1.0, lambda_R=1.0):
         """
         Structure-aware loss that combines edge-aware illumination smoothness and reflectance fidelity.
         
         Parameters:
-            S (torch.Tensor): Original low-light hyperspectral image, shape (B, C, H, W).
             R (torch.Tensor): Predicted reflectance, shape (B, C, H, W).
             I (torch.Tensor): Predicted illumination, shape (B, 1, H, W).
             R_enh (torch.Tensor): Reflectance of the enhanced image, shape (B, C, H, W).
@@ -449,40 +430,21 @@ class LowLightEnhance(nn.Module):
         loss_I_y = torch.mean(weight_y * grad_I_y.abs())
         loss_I = loss_I_x + loss_I_y
 
-        '''# --------------------------
-        # 2. Reflectance Fidelity Loss
-        # --------------------------
-        # Pixel-wise L1 loss between reflectance and original input
-        loss_R1 = torch.mean(torch.abs(R - S))
-        
-        # Compute gradients for reflectance R and input S
-        grad_R_S_x = self.gradient_x(R)
-        grad_R_S_y = self.gradient_y(R)
-        grad_S_x = self.gradient_x(S)
-        grad_S_y = self.gradient_y(S)
-        
-        # L1 loss on the difference of gradients
-        loss_R2_x = torch.mean(torch.abs(grad_R_S_x - grad_S_x))
-        loss_R2_y = torch.mean(torch.abs(grad_R_S_y - grad_S_y))
-        loss_R2 = loss_R2_x + loss_R2_y
-        
-        loss_R = loss_R1 + beta * loss_R2'''
-
         # --------------------------
         # 2. Reflectance Fidelity Loss
         # --------------------------
-        # Pixel-wise L1 loss between reflectance and original input
+        # Pixel-wise L1 loss between two reflectances
         loss_R1 = torch.mean(torch.abs(R - R_enh))
         
-        # Compute gradients for reflectance R and input S
-        grad_R_S_x = self.gradient_x(R)
-        grad_R_S_y = self.gradient_y(R)
-        grad_S_x = self.gradient_x(R_enh)
-        grad_S_y = self.gradient_y(R_enh)
+        # Compute gradients for reflectances R and R_enh
+        grad_R_x = self.gradient_x(R)
+        grad_R_y = self.gradient_y(R)
+        grad_R_enh_x = self.gradient_x(R_enh)
+        grad_R_enh_y = self.gradient_y(R_enh)
         
         # L1 loss on the difference of gradients
-        loss_R2_x = torch.mean(torch.abs(grad_R_S_x - grad_S_x))
-        loss_R2_y = torch.mean(torch.abs(grad_R_S_y - grad_S_y))
+        loss_R2_x = torch.mean(torch.abs(grad_R_x - grad_R_enh_x))
+        loss_R2_y = torch.mean(torch.abs(grad_R_y - grad_R_enh_y))
         loss_R2 = loss_R2_x + loss_R2_y
         
         loss_R = loss_R1 + beta * loss_R2
@@ -493,83 +455,49 @@ class LowLightEnhance(nn.Module):
         total_loss = lambda_I * loss_I + lambda_R * loss_R
         return total_loss
 
-    def compute_loss(self, input_low, input_high, input_low_eq):
+    def compute_loss(self, input_low, input_high):
         R_low, I_low, I_delta, S = self.forward(input_low)
         R_enh, I_enh = self.decom_net(S)
-        recon_loss = torch.mean(torch.abs(R_low * I_low - input_high))
+        
+        L_reconstruction = torch.mean(torch.abs(R_low * I_low - input_high))
+        L_str_awareness = self.structure_aware_loss(R_low, I_low, R_enh, alpha=1.0, beta=0.5, lambda_I=1.0, lambda_R=1.0)
+        L_I_smooth_delta = self.smooth_loss(I_delta, R_low)
+        L_fourier = self.fourier_spectrum_loss(input_low, S, cutoff=0.1, loss_type="l1")
+        L_spectral_cons = self.spectral_smoothness_loss(S, loss_type="l1")
+        
+        total_loss = (
+            self.c_loss_reconstruction * L_reconstruction + 
+            self.c_loss_str_awareness * L_str_awareness +
+            self.c_loss_i_smooth_delta * L_I_smooth_delta + 
+            self.c_loss_fourier * L_fourier + 
+            self.c_loss_spectral_cons * L_spectral_cons
+            )
 
-        R_low_pca = self.pca_projection_loss(R_low)
-        #recon_loss_eq = torch.mean(torch.abs(R_low_pca - input_low_eq))
-        r_consistency_loss = torch.mean(torch.abs(R_low - R_enh))
-
-        R_gray = torch.mean(R_low, dim=1, keepdim=True)
-        #R_smooth_loss = torch.mean(torch.abs(self.compute_gradients(R_gray)[0])) + torch.mean(torch.abs(self.compute_gradients(R_gray)[1]))
-        str_aware_loss = self.structure_aware_loss(input_low, R_low, I_low, R_enh, alpha=1.0, beta=0.5, lambda_I=1.0, lambda_R=1.0)
-
-        I_smooth_loss = self.smooth_loss(I_low, R_gray)
-        
-        I_smooth_loss_delta = self.smooth_loss(I_delta, R_low)
-        
-        relight_loss = torch.mean(torch.abs(R_low * I_delta - input_high))
-        
-        fourier_loss = self.fourier_spectrum_loss(input_low, S, cutoff=0.1, loss_type="l1")
-        
-        spectral_loss = self.spectral_smoothness_loss(S, loss_type="l1")
-        
-        loss_Decom = (self.coeff_recon_loss_low * recon_loss + 
-                      self.coeff_Ismooth_loss_low * I_smooth_loss + 
-                      self.coeff_r_consistency_loss * r_consistency_loss + 
-                      self.coeff_str_aware_loss * str_aware_loss)
-        loss_Relight = (self.coeff_relight_loss * relight_loss + 
-                        self.coeff_Ismooth_loss_delta * I_smooth_loss_delta)
-        loss_combined = (self.coeff_recon_loss_low * recon_loss + 
-                         self.coeff_Ismooth_loss_low * I_smooth_loss + 
-                         self.coeff_r_consistency_loss * r_consistency_loss + 
-                         self.coeff_str_aware_loss * str_aware_loss +
-                         self.coeff_relight_loss * relight_loss + 
-                         self.coeff_Ismooth_loss_delta * I_smooth_loss_delta + 
-                         self.coeff_fourier_loss * fourier_loss + 
-                         self.coeff_spectral_loss * spectral_loss)
         losses = {
-            'total_loss': loss_combined.item(),
-            'recon_loss': recon_loss.item(),
-            'r_consistency_loss': r_consistency_loss.item(),
-            'str_aware_loss': str_aware_loss.item(),
-            'I_smooth_loss': I_smooth_loss.item(),
-            'I_smooth_loss_delta': I_smooth_loss_delta.item(),
-            'relight_loss': relight_loss.item(),
-            'fourier_loss': fourier_loss.item(),
-            'decom_loss': loss_Decom.item(),
-            'relightNet_loss': loss_Relight.item(),
-            'spectral_loss': spectral_loss.item()
+            'total_loss': total_loss.item(),
+            'L_reconstruction': L_reconstruction.item(),
+            'L_str_awareness': L_str_awareness.item(),
+            'L_I_smooth_delta': L_I_smooth_delta.item(),
+            'L_fourier': L_fourier.item(),
+            'L_spectral_cons': L_spectral_cons.item()
         }
-        return loss_combined, losses
+        return total_loss, losses
 
     def append_to_loss_dict(self, cur_epoch_losses, count):
         self.all_epoch_losses['total_loss'].append(cur_epoch_losses['total_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['recon_loss'].append(cur_epoch_losses['recon_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['r_consistency_loss'].append(cur_epoch_losses['r_consistency_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['str_aware_loss'].append(cur_epoch_losses['str_aware_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['I_smooth_loss'].append(cur_epoch_losses['I_smooth_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['I_smooth_loss_delta'].append(cur_epoch_losses['I_smooth_loss_delta'] / count if count > 0 else 0)
-        self.all_epoch_losses['relight_loss'].append(cur_epoch_losses['relight_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['fourier_loss'].append(cur_epoch_losses['fourier_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['decom_loss'].append(cur_epoch_losses['decom_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['relightNet_loss'].append(cur_epoch_losses['relightNet_loss'] / count if count > 0 else 0)
-        self.all_epoch_losses['spectral_loss'].append(cur_epoch_losses['spectral_loss'] / count if count > 0 else 0)
+        self.all_epoch_losses['L_reconstruction'].append(cur_epoch_losses['L_reconstruction'] / count if count > 0 else 0)
+        self.all_epoch_losses['L_str_awareness'].append(cur_epoch_losses['L_str_awareness'] / count if count > 0 else 0)
+        self.all_epoch_losses['L_I_smooth_delta'].append(cur_epoch_losses['L_I_smooth_delta'] / count if count > 0 else 0)
+        self.all_epoch_losses['L_fourier'].append(cur_epoch_losses['L_fourier'] / count if count > 0 else 0)
+        self.all_epoch_losses['L_spectral_cons'].append(cur_epoch_losses['L_spectral_cons'] / count if count > 0 else 0)
 
     def accumulate_loss_dict(self, cur_epoch_losses, batch_losses):
         cur_epoch_losses['total_loss'] += batch_losses['total_loss']
-        cur_epoch_losses['recon_loss'] += batch_losses['recon_loss']
-        cur_epoch_losses['r_consistency_loss'] += batch_losses['r_consistency_loss']
-        cur_epoch_losses['str_aware_loss'] += batch_losses['str_aware_loss']
-        cur_epoch_losses['I_smooth_loss'] += batch_losses['I_smooth_loss']
-        cur_epoch_losses['I_smooth_loss_delta'] += batch_losses['I_smooth_loss_delta']
-        cur_epoch_losses['relight_loss'] += batch_losses['relight_loss']
-        cur_epoch_losses['fourier_loss'] += batch_losses['fourier_loss']
-        cur_epoch_losses['decom_loss'] += batch_losses['decom_loss']
-        cur_epoch_losses['relightNet_loss'] += batch_losses['relightNet_loss']
-        cur_epoch_losses['spectral_loss'] += batch_losses['spectral_loss']
+        cur_epoch_losses['L_reconstruction'] += batch_losses['L_reconstruction']
+        cur_epoch_losses['L_str_awareness'] += batch_losses['L_str_awareness']
+        cur_epoch_losses['L_I_smooth_delta'] += batch_losses['L_I_smooth_delta']
+        cur_epoch_losses['L_fourier'] += batch_losses['L_fourier']
+        cur_epoch_losses['L_spectral_cons'] += batch_losses['L_spectral_cons']
 
     def save_checkpoint(self, path, epoch):
         torch.save({
@@ -591,91 +519,51 @@ class LowLightEnhance(nn.Module):
         epochs = range(1, len(self.all_epoch_losses['total_loss']) + 1)
         
         plt.figure(figsize=(20, 10))
-        
+
         # Plot each loss in a separate subplot
-        plt.subplot(3, 4, 1)
-        plt.plot(epochs, self.all_epoch_losses['total_loss'], 'k-', label='Total Loss')
+        plt.subplot(2, 3, 1)
+        plt.plot(epochs, self.all_epoch_losses['total_loss'], 'k-', label='total_loss')
         plt.title('Total Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
         plt.legend()
-        
-        plt.subplot(3, 4, 2)
-        plt.plot(epochs, self.all_epoch_losses['recon_loss'], 'r-', label='Reconstruction Loss')
+
+        plt.subplot(2, 3, 2)
+        plt.plot(epochs, self.all_epoch_losses['L_reconstruction'], 'r-', label='L_reconstruction')
         plt.title('Reconstruction Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
         plt.legend()
-        
-        plt.subplot(3, 4, 3)
-        plt.plot(epochs, self.all_epoch_losses['r_consistency_loss'], 'b-', label='R Consistency Loss')
-        plt.title('R Consistency Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.grid(True)
-        plt.legend()
-        
-        plt.subplot(3, 4, 4)
-        plt.plot(epochs, self.all_epoch_losses['str_aware_loss'], 'g-', label='Str Aware Loss')
-        plt.title('Structure Aware Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.grid(True)
-        plt.legend()
-        
-        plt.subplot(3, 4, 5)
-        plt.plot(epochs, self.all_epoch_losses['I_smooth_loss'], 'm-', label='I Smoothness Loss')
-        plt.title('I Smoothness Loss')
+
+        plt.subplot(2, 3, 3)
+        plt.plot(epochs, self.all_epoch_losses['L_str_awareness'], 'b-', label='L_str_awareness')
+        plt.title('Structure-awareness Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(3, 4, 6)
-        plt.plot(epochs, self.all_epoch_losses['I_smooth_loss_delta'], 'r-', label='I Smoothness Delta Loss')
-        plt.title('I Smoothness Delta Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.grid(True)
-        plt.legend()
-        
-        plt.subplot(3, 4, 7)
-        plt.plot(epochs, self.all_epoch_losses['relight_loss'], 'c-', label='Relightness Loss')
-        plt.title('Relightness Loss')
+        plt.subplot(2, 3, 4)
+        plt.plot(epochs, self.all_epoch_losses['L_I_smooth_delta'], 'g-', label='L_I_smooth_delta')
+        plt.title('Structure-aware Illumination Smoothness Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(3, 4, 8)
-        plt.plot(epochs, self.all_epoch_losses['decom_loss'], 'y-', label='Decom Loss')
-        plt.title('Decom Loss')
+        plt.subplot(2, 3, 5)
+        plt.plot(epochs, self.all_epoch_losses['L_fourier'], 'm-', label='L_fourier')
+        plt.title('Fourier Spectrum Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(3, 4, 9)
-        plt.plot(epochs, self.all_epoch_losses['relightNet_loss'], 'g-', label='RelightNet Loss')
-        plt.title('RelightNet Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.grid(True)
-        plt.legend()
-
-        plt.subplot(3, 4, 10)
-        plt.plot(epochs, self.all_epoch_losses['fourier_loss'], 'm-', label='Fourier Loss')
-        plt.title('Fourier Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.grid(True)
-        plt.legend()
-
-        plt.subplot(3, 4, 11)
-        plt.plot(epochs, self.all_epoch_losses['spectral_loss'], 'r-', label='Spectral Smoothness Loss')
-        plt.title('Spectral Smoothness Loss')
+        plt.subplot(2, 3, 6)
+        plt.plot(epochs, self.all_epoch_losses['L_spectral_cons'], 'c-', label='L_spectral_cons')
+        plt.title('Spectral Consistency Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)

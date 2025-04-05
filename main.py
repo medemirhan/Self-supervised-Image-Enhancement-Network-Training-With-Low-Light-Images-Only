@@ -81,15 +81,14 @@ def main(args):
     model = LowLightEnhance(
         input_channels=args.channels,
         lr=args.start_lr,
+        lr_update_factor=args.lr_update_factor,
+        lr_update_period=args.lr_update_period,
         time_stamp=args.timestamp,
-        coeff_recon_loss_low=args.coeff_recon_loss_low, 
-        coeff_Ismooth_loss_low=args.coeff_Ismooth_loss_low,
-        coeff_r_consistency_loss=args.coeff_r_consistency_loss,
-        coeff_str_aware_loss=args.coeff_str_aware_loss,
-        coeff_relight_loss=args.coeff_relight_loss,
-        coeff_Ismooth_loss_delta=args.coeff_Ismooth_loss_delta,
-        coeff_fourier_loss=args.coeff_fourier_loss,
-        coeff_spectral_loss=args.coeff_spectral_loss,
+        c_loss_reconstruction=args.c_loss_reconstruction,
+        c_loss_str_awareness=args.c_loss_str_awareness,
+        c_loss_i_smooth_delta=args.c_loss_i_smooth_delta,
+        c_loss_fourier=args.c_loss_fourier,
+        c_loss_spectral_cons=args.c_loss_spectral_cons,
         device=device
     )
     
@@ -173,14 +172,11 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError('Dataset type ' + args.dataset_type + ' is not implemented.')
 
-    args.coeff_recon_loss_low = 10
-    args.coeff_Ismooth_loss_low = 1
-    args.coeff_r_consistency_loss = 1
-    args.coeff_str_aware_loss = 1
-    args.coeff_relight_loss = 0.2
-    args.coeff_Ismooth_loss_delta = 20
-    args.coeff_fourier_loss = 0.2
-    args.coeff_spectral_loss = 1
+    args.c_loss_reconstruction = 10
+    args.c_loss_str_awareness = 1
+    args.c_loss_i_smooth_delta = 20
+    args.c_loss_fourier = 0.2
+    args.c_loss_spectral_cons = 1
 
     args.batch_size = 1
     args.patch_size = 128
