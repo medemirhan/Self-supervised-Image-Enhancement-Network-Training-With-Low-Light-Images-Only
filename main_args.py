@@ -123,6 +123,8 @@ def main(args):
     model = LowLightEnhance(
         input_channels=args.channels,
         lr=args.start_lr,
+        lr_update_factor=args.lr_update_factor,
+        lr_update_period=args.lr_update_period,
         time_stamp=args.timestamp,
         coeff_recon_loss_low=args.coeff_recon_loss_low, 
         coeff_Ismooth_loss_low=args.coeff_Ismooth_loss_low,

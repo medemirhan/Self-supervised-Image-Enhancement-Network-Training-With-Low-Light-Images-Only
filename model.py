@@ -175,7 +175,7 @@ class RelightNet(nn.Module):
         return output
 
 class LowLightEnhance(nn.Module):
-    def __init__(self, input_channels=64, lr=1e-3, time_stamp=None, 
+    def __init__(self, input_channels=64, lr=1e-3, lr_update_factor=1, lr_update_period=None, time_stamp=None, 
                  coeff_recon_loss_low=10, coeff_Ismooth_loss_low=1, coeff_r_consistency_loss=1,
                  coeff_str_aware_loss=1, coeff_relight_loss=0.2, coeff_Ismooth_loss_delta=20,
                  coeff_fourier_loss=0.2, coeff_spectral_loss=1, device=torch.device("cpu")):
@@ -192,11 +192,20 @@ class LowLightEnhance(nn.Module):
         self.coeff_fourier_loss = coeff_fourier_loss
         self.coeff_spectral_loss = coeff_spectral_loss
         self.lr = lr
-        
+        self.lr_update_factor = lr_update_factor
+        self.lr_update_period = lr_update_period
+        self.adaptive_lr = False
+
+        if abs(self.lr_update_factor - 1) > 1e-6:
+            self.adaptive_lr = True
+
         self.decom_net = DecomNet(in_channels=input_channels)
         self.relight_net = RelightNet(in_channels=input_channels)
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        
+        if self.adaptive_lr:
+            self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.lr_update_period, gamma=self.lr_update_factor)
         
         self.all_epoch_losses = {'total_loss': [], 'recon_loss': [], 'r_consistency_loss': [], 'str_aware_loss': [],
                              'I_smooth_loss': [], 'I_smooth_loss_delta': [], 'relight_loss': [],
@@ -234,12 +243,12 @@ class LowLightEnhance(nn.Module):
             eval_low_data.append(eval_im)
         
         num_batches = len(train_low_data) // batch_size
-        lr_schedule = [start_lr] * num_epochs
         iter_num = 0
 
         log_params = {
             "epochs": num_epochs,
-            "lr": start_lr,
+            "start_lr": start_lr,
+            "adaptive_lr": self.adaptive_lr,
             "batch_size": batch_size,
             "optimizer": "Adam",
         }
@@ -306,7 +315,11 @@ class LowLightEnhance(nn.Module):
             if (epoch + 1) % eval_every_epoch == 0:
                 self.save_checkpoint(os.path.join(ckpt_dir, f"model_epoch_{epoch+1}.pth"), epoch+1)
                 self.save_checkpoint(os.path.join(ckpt_dir, "model_epoch_latest.pth"), epoch+1)
-            
+
+            mlflow.log_metric("learning_rate", self.optimizer.param_groups[0]['lr'], step=epoch)
+            if self.adaptive_lr:
+                self.scheduler.step()
+
             print(f"Epoch [{epoch+1}/{num_epochs}] Average Loss: {avg_epoch_loss:.6f}")
 
             mlflow.log_metrics(cur_epoch_losses, step=epoch)

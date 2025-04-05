@@ -185,6 +185,8 @@ if __name__ == '__main__':
     args.batch_size = 1
     args.patch_size = 128
     args.start_lr = 1e-3
+    args.lr_update_factor = 1
+    args.lr_update_period = 400
 
     # Change if necessary
     args.train_data = '../PairLIE/data/hsi_dataset_indoor_only/train'
