@@ -418,6 +418,7 @@ class LowLightEnhance(nn.Module):
             S (torch.Tensor): Original low-light hyperspectral image, shape (B, C, H, W).
             R (torch.Tensor): Predicted reflectance, shape (B, C, H, W).
             I (torch.Tensor): Predicted illumination, shape (B, 1, H, W).
+            R_enh (torch.Tensor): Reflectance of the enhanced image, shape (B, C, H, W).
             alpha (float): Weighting parameter for edge-aware weighting.
             beta (float): Weight for the gradient term in the reflectance loss.
             lambda_I (float): Weight for the illumination loss.
@@ -448,7 +449,7 @@ class LowLightEnhance(nn.Module):
         loss_I_y = torch.mean(weight_y * grad_I_y.abs())
         loss_I = loss_I_x + loss_I_y
 
-        # --------------------------
+        '''# --------------------------
         # 2. Reflectance Fidelity Loss
         # --------------------------
         # Pixel-wise L1 loss between reflectance and original input
@@ -465,9 +466,9 @@ class LowLightEnhance(nn.Module):
         loss_R2_y = torch.mean(torch.abs(grad_R_S_y - grad_S_y))
         loss_R2 = loss_R2_x + loss_R2_y
         
-        loss_R = loss_R1 + beta * loss_R2
+        loss_R = loss_R1 + beta * loss_R2'''
 
-        '''# --------------------------
+        # --------------------------
         # 2. Reflectance Fidelity Loss
         # --------------------------
         # Pixel-wise L1 loss between reflectance and original input
@@ -484,7 +485,7 @@ class LowLightEnhance(nn.Module):
         loss_R2_y = torch.mean(torch.abs(grad_R_S_y - grad_S_y))
         loss_R2 = loss_R2_x + loss_R2_y
         
-        loss_R = loss_R1 + beta * loss_R2'''
+        loss_R = loss_R1 + beta * loss_R2
 
         # --------------------------
         # 3. Total Loss
