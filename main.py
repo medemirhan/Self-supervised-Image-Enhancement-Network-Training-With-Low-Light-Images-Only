@@ -85,7 +85,8 @@ def main(args):
         lr_update_period=args.lr_update_period,
         time_stamp=args.timestamp,
         c_loss_reconstruction=args.c_loss_reconstruction,
-        c_loss_str_awareness=args.c_loss_str_awareness,
+        c_loss_r_fidelity=args.c_loss_r_fidelity,
+        c_loss_i_smooth_low=args.c_loss_i_smooth_low,
         c_loss_i_smooth_delta=args.c_loss_i_smooth_delta,
         c_loss_fourier=args.c_loss_fourier,
         c_loss_spectral_cons=args.c_loss_spectral_cons,
@@ -173,7 +174,8 @@ if __name__ == '__main__':
         raise NotImplementedError('Dataset type ' + args.dataset_type + ' is not implemented.')
 
     args.c_loss_reconstruction = 10
-    args.c_loss_str_awareness = 1
+    args.c_loss_r_fidelity = 1
+    args.c_loss_i_smooth_low = 1
     args.c_loss_i_smooth_delta = 20
     args.c_loss_fourier = 0.2
     args.c_loss_spectral_cons = 1

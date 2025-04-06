@@ -22,7 +22,8 @@ epoch: 400
 eval_every_epoch: 200
 plot_every_epoch: 200
 c_loss_reconstruction: 10
-c_loss_str_awareness: 1
+c_loss_r_fidelity: 1
+c_loss_i_smooth_low: 1
 c_loss_i_smooth_delta: 20
 c_loss_fourier: 0.2
 c_loss_spectral_cons: 1

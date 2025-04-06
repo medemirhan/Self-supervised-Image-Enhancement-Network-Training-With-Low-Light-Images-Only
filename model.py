@@ -176,14 +176,15 @@ class RelightNet(nn.Module):
 
 class LowLightEnhance(nn.Module):
     def __init__(self, input_channels=64, lr=1e-3, lr_update_factor=1, lr_update_period=None, time_stamp=None, 
-                 c_loss_reconstruction=10, c_loss_str_awareness=1, c_loss_i_smooth_delta=20,
+                 c_loss_reconstruction=10, c_loss_r_fidelity=1, c_loss_i_smooth_low=1, c_loss_i_smooth_delta=20,
                  c_loss_fourier=0.2, c_loss_spectral_cons=1, device=torch.device("cpu")):
         super(LowLightEnhance, self).__init__()
         self.input_channels = input_channels
         self.device = device
         self.time_stamp = time_stamp
         self.c_loss_reconstruction = c_loss_reconstruction
-        self.c_loss_str_awareness = c_loss_str_awareness
+        self.c_loss_r_fidelity = c_loss_r_fidelity
+        self.c_loss_i_smooth_low = c_loss_i_smooth_low
         self.c_loss_i_smooth_delta = c_loss_i_smooth_delta
         self.c_loss_fourier = c_loss_fourier
         self.c_loss_spectral_cons = c_loss_spectral_cons
@@ -206,7 +207,8 @@ class LowLightEnhance(nn.Module):
         self.all_epoch_losses = {
             'total_loss': [],
             'L_reconstruction': [],
-            'L_str_awareness': [],
+            'L_R_fidelity': [],
+            'L_I_smooth_low': [],
             'L_I_smooth_delta': [],
             'L_fourier': [],
             'L_spectral_cons': []
@@ -264,7 +266,8 @@ class LowLightEnhance(nn.Module):
             cur_epoch_losses = {
                 'total_loss': 0,
                 'L_reconstruction': 0,
-                'L_str_awareness': 0,
+                'L_R_fidelity': 0,
+                'L_I_smooth_low': 0,
                 'L_I_smooth_delta': 0,
                 'L_fourier': 0,
                 'L_spectral_cons': 0
@@ -346,15 +349,17 @@ class LowLightEnhance(nn.Module):
             avg_run_time = total_run_time / len(test_low_data) if len(test_low_data) > 0 else 0
             print(f"Average run time: {avg_run_time:.4f} seconds.")
 
-    def smooth_loss(self, I, R):
-        grad_Ix = torch.abs(self.gradient_x(I))
-        grad_Iy = torch.abs(self.gradient_y(I))
-        grad_Rx = torch.abs(self.gradient_x(R))
-        grad_Ry = torch.abs(self.gradient_y(R))
-
-        loss = torch.mean(grad_Ix * torch.exp(-10 * grad_Rx)) + torch.mean(grad_Iy * torch.exp(-10 * grad_Ry))
-        return loss
+    def compute_gradients(self, img):
+        grad_x = torch.abs(img[:, :, :, 1:] - img[:, :, :, :-1])
+        grad_y = torch.abs(img[:, :, 1:, :] - img[:, :, :-1, :])
+        return grad_x, grad_y
     
+    def smooth_loss(self, I, R, alpha=10):
+        grad_Ix, grad_Iy = self.compute_gradients(I)
+        grad_Rx, grad_Ry = self.compute_gradients(R)
+        loss = torch.mean(grad_Ix * torch.exp(-alpha * grad_Rx)) + torch.mean(grad_Iy * torch.exp(-alpha * grad_Ry))
+        return loss
+
     def fourier_spectrum_loss(self, input_hsi, target_hsi, cutoff=0.1, loss_type="l1"):
         fft_input = torch.fft.fft2(input_hsi)
         fft_target = torch.fft.fft2(target_hsi)
@@ -450,22 +455,25 @@ class LowLightEnhance(nn.Module):
         # --------------------------
         # 3. Total Loss
         # --------------------------
-        total_loss = lambda_I * loss_I + lambda_R * loss_R
-        return total_loss
+        i_loss = lambda_I * loss_I
+        r_loss = lambda_R * loss_R
+
+        return i_loss, r_loss
 
     def compute_loss(self, input_low, input_high):
         R_low, I_low, I_delta, S = self.forward(input_low)
         R_enh, I_enh = self.decom_net(S)
         
         L_reconstruction = torch.mean(torch.abs(R_low * I_low - input_high))
-        L_str_awareness = self.structure_aware_loss(R_low, I_low, R_enh, alpha=1.0, beta=0.5, lambda_I=1.0, lambda_R=1.0)
-        L_I_smooth_delta = self.smooth_loss(I_delta, R_low)
+        L_I_smooth_low, L_R_fidelity = self.structure_aware_loss(R_low, I_low, R_enh, alpha=1.0, beta=0.5, lambda_I=1.0, lambda_R=1.0)
+        L_I_smooth_delta = self.smooth_loss(I_delta, R_low, alpha=10)
         L_fourier = self.fourier_spectrum_loss(input_low, S, cutoff=0.1, loss_type="l1")
         L_spectral_cons = self.spectral_smoothness_loss(S, loss_type="l1")
         
         total_loss = (
             self.c_loss_reconstruction * L_reconstruction + 
-            self.c_loss_str_awareness * L_str_awareness +
+            self.c_loss_r_fidelity * L_R_fidelity +
+            self.c_loss_i_smooth_low * L_I_smooth_low +
             self.c_loss_i_smooth_delta * L_I_smooth_delta + 
             self.c_loss_fourier * L_fourier + 
             self.c_loss_spectral_cons * L_spectral_cons
@@ -474,7 +482,8 @@ class LowLightEnhance(nn.Module):
         losses = {
             'total_loss': total_loss.item(),
             'L_reconstruction': L_reconstruction.item(),
-            'L_str_awareness': L_str_awareness.item(),
+            'L_R_fidelity': L_R_fidelity.item(),
+            'L_I_smooth_low': L_I_smooth_low.item(),
             'L_I_smooth_delta': L_I_smooth_delta.item(),
             'L_fourier': L_fourier.item(),
             'L_spectral_cons': L_spectral_cons.item()
@@ -484,7 +493,8 @@ class LowLightEnhance(nn.Module):
     def append_to_loss_dict(self, cur_epoch_losses, count):
         self.all_epoch_losses['total_loss'].append(cur_epoch_losses['total_loss'] / count if count > 0 else 0)
         self.all_epoch_losses['L_reconstruction'].append(cur_epoch_losses['L_reconstruction'] / count if count > 0 else 0)
-        self.all_epoch_losses['L_str_awareness'].append(cur_epoch_losses['L_str_awareness'] / count if count > 0 else 0)
+        self.all_epoch_losses['L_R_fidelity'].append(cur_epoch_losses['L_R_fidelity'] / count if count > 0 else 0)
+        self.all_epoch_losses['L_I_smooth_low'].append(cur_epoch_losses['L_I_smooth_low'] / count if count > 0 else 0)
         self.all_epoch_losses['L_I_smooth_delta'].append(cur_epoch_losses['L_I_smooth_delta'] / count if count > 0 else 0)
         self.all_epoch_losses['L_fourier'].append(cur_epoch_losses['L_fourier'] / count if count > 0 else 0)
         self.all_epoch_losses['L_spectral_cons'].append(cur_epoch_losses['L_spectral_cons'] / count if count > 0 else 0)
@@ -492,7 +502,8 @@ class LowLightEnhance(nn.Module):
     def accumulate_loss_dict(self, cur_epoch_losses, batch_losses):
         cur_epoch_losses['total_loss'] += batch_losses['total_loss']
         cur_epoch_losses['L_reconstruction'] += batch_losses['L_reconstruction']
-        cur_epoch_losses['L_str_awareness'] += batch_losses['L_str_awareness']
+        cur_epoch_losses['L_R_fidelity'] += batch_losses['L_R_fidelity']
+        cur_epoch_losses['L_I_smooth_low'] += batch_losses['L_I_smooth_low']
         cur_epoch_losses['L_I_smooth_delta'] += batch_losses['L_I_smooth_delta']
         cur_epoch_losses['L_fourier'] += batch_losses['L_fourier']
         cur_epoch_losses['L_spectral_cons'] += batch_losses['L_spectral_cons']
@@ -519,7 +530,7 @@ class LowLightEnhance(nn.Module):
         plt.figure(figsize=(20, 10))
 
         # Plot each loss in a separate subplot
-        plt.subplot(2, 3, 1)
+        plt.subplot(3, 3, 1)
         plt.plot(epochs, self.all_epoch_losses['total_loss'], 'k-', label='total_loss')
         plt.title('Total Loss')
         plt.xlabel('Epoch')
@@ -527,7 +538,7 @@ class LowLightEnhance(nn.Module):
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(2, 3, 2)
+        plt.subplot(3, 3, 2)
         plt.plot(epochs, self.all_epoch_losses['L_reconstruction'], 'r-', label='L_reconstruction')
         plt.title('Reconstruction Loss')
         plt.xlabel('Epoch')
@@ -535,23 +546,31 @@ class LowLightEnhance(nn.Module):
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(2, 3, 3)
-        plt.plot(epochs, self.all_epoch_losses['L_str_awareness'], 'b-', label='L_str_awareness')
-        plt.title('Structure-awareness Loss')
+        plt.subplot(3, 3, 3)
+        plt.plot(epochs, self.all_epoch_losses['L_R_fidelity'], 'b-', label='L_R_fidelity')
+        plt.title('Reflectance Fidelity Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(2, 3, 4)
+        plt.subplot(3, 3, 4)
+        plt.plot(epochs, self.all_epoch_losses['L_I_smooth_low'], 'y-', label='L_I_smooth_low')
+        plt.title('Structure-aware Illumination Smoothness Loss (I_low)')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.grid(True)
+        plt.legend()
+
+        plt.subplot(3, 3, 5)
         plt.plot(epochs, self.all_epoch_losses['L_I_smooth_delta'], 'g-', label='L_I_smooth_delta')
-        plt.title('Structure-aware Illumination Smoothness Loss')
+        plt.title('Structure-aware Illumination Smoothness Loss (I_delta)')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(2, 3, 5)
+        plt.subplot(3, 3, 6)
         plt.plot(epochs, self.all_epoch_losses['L_fourier'], 'm-', label='L_fourier')
         plt.title('Fourier Spectrum Loss')
         plt.xlabel('Epoch')
@@ -559,7 +578,7 @@ class LowLightEnhance(nn.Module):
         plt.grid(True)
         plt.legend()
 
-        plt.subplot(2, 3, 6)
+        plt.subplot(3, 3, 7)
         plt.plot(epochs, self.all_epoch_losses['L_spectral_cons'], 'c-', label='L_spectral_cons')
         plt.title('Spectral Consistency Loss')
         plt.xlabel('Epoch')
