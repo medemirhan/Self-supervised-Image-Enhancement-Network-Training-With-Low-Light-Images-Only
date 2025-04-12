@@ -62,17 +62,50 @@ def single_img_bandwise_metrics(pred_path, label_path, data_min=None, data_max=N
     h, w, c = im1.shape
     psnr_vec = []
     ssim_vec = []
-    #sam_vec = []
     for i in range(c):
         score_psnr = psnr(im1[:,:,i], im2[:,:,i], data_range=data_range) # data range onemli. incele!
         score_ssim = ssim_bandwise(im1[:,:,i], im2[:,:,i], data_range=data_range) # data range onemli. incele!
-        #score_sam = sam_bandwise(im1[:,:,i], im2[:,:,i], reduction='elementwise_mean') # reduction onemli. incele!
 
         psnr_vec.append(score_psnr)
         ssim_vec.append(score_ssim)
-        #sam_vec.append(score_sam)
 
     return np.array(psnr_vec), np.array(ssim_vec)
+
+def multi_img_bandwise_metrics(preds_path, labels_path, data_min=None, data_max=None, matKeyPrediction='data', matKeyGt='data'):
+    preds = glob.glob(os.path.join(preds_path, '*.mat'))
+
+    psnr_sum = None
+    ssim_sum = None
+    count = 0
+    for pred_img in preds:
+        filename = os.path.basename(pred_img)
+        label_img = os.path.join(labels_path, filename)
+
+        psnr_cur, ssim_cur = single_img_bandwise_metrics(
+            pred_img,
+            label_img,
+            data_min=data_min,
+            data_max=data_max,
+            matKeyPrediction=matKeyPrediction,
+            matKeyGt=matKeyGt
+            )
+        
+        if psnr_sum is None:
+            psnr_sum = psnr_cur.copy()
+        else:
+            psnr_sum += psnr_cur
+
+        if ssim_sum is None:
+            ssim_sum = ssim_cur.copy()
+        else:
+            ssim_sum += ssim_cur
+
+        count += 1
+    
+    psnr_avg_vec = np.array(psnr_sum / count)
+    ssim_avg_vec = np.array(ssim_sum / count)
+
+    return psnr_avg_vec, ssim_avg_vec
 
 def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPrediction='data', matKeyGt='data'):    
     avg_psnr = 0
@@ -124,7 +157,7 @@ if __name__ == '__main__':
     normalLightMin = 0.0708354
     normalLightMax = 1.7410845
 
-    im_dir = '../denoising/LRTDTV/denoised/*.mat'
+    im_dir = '../denoising/HCANet/results/dim32/*.mat'
     label_dir = '../PairLIE/data/label_ll'
 
     avg_psnr, avg_ssim, avg_sam = calc_metrics(
@@ -141,7 +174,7 @@ if __name__ == '__main__':
     print(f'===> Avg.SAM  : {avg_sam:.4f}')
     
     '''psnr_vec, ssim_vec = single_img_bandwise_metrics(
-        pred_path='C:/Users/medemirhan/Desktop/comparison/msr/5/buildingblock.mat',
+        pred_path='C:/Users/medemirhan/Desktop/comparison/results/msr/5/buildingblock.mat',
         label_path='C:/Users/medemirhan/Desktop/n2n/PairLIE/data/label_ll/buildingblock.mat',
         data_min=None,
         data_max=globalMax,
@@ -151,3 +184,12 @@ if __name__ == '__main__':
     
     sio.savemat('./psnr_vec6.mat', {"data": np.array(psnr_vec)})
     sio.savemat('./ssim_vec6.mat', {"data": np.array(ssim_vec)})'''
+
+    multi_img_bandwise_metrics(
+        preds_path='C:/Users/medemirhan/Desktop/comparison/results/msr/5',
+        labels_path='C:/Users/medemirhan/Desktop/n2n/PairLIE/data/label_ll',
+        data_min=None,
+        data_max=globalMax,
+        matKeyPrediction='data',
+        matKeyGt='data'
+        )

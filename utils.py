@@ -275,3 +275,35 @@ def nmf_projection(hyper_img, n_components=1, init='nndsvda', random_state=0):
     nmf_img = W.reshape(h, w, 1)
     
     return nmf_img
+
+def select_hsi_wavelengths(range_start, range_end, total_channels, d_head, d_tail, s=3):
+    """
+    Computes the wavelengths of the selected bands from an HSI image.
+    
+    Parameters:
+      range_start (float): Starting wavelength (in nm).
+      range_end (float): Ending wavelength (in nm).
+      total_channels (int): Total number of channels (bands) in the original image.
+      d_head (int): Number of bands to remove from the start.
+      d_tail (int): Number of bands to remove from the end.
+      s (int): Step size for selecting bands (default is 3, meaning a "select, don't, don't" pattern).
+    
+    Returns:
+      selected_wavelengths (np.ndarray): Array of wavelengths of the selected bands.
+      num_selected (int): The number of selected bands.
+    """
+    # Create an array of wavelengths linearly spaced from range_start to range_end
+    wavelengths = np.linspace(range_start, range_end, total_channels)
+    
+    # Remove the first d_head and the last d_tail bands.
+    # If d_tail is 0, we take all bands until the end.
+    if d_tail > 0:
+        remaining_wavelengths = wavelengths[d_head:-d_tail]
+    else:
+        remaining_wavelengths = wavelengths[d_head:]
+    
+    # Select bands using the pattern "select, don't, don't, ..." i.e., every s-th band.
+    selected_wavelengths = remaining_wavelengths[::s]
+    num_selected = len(selected_wavelengths)
+    
+    return selected_wavelengths, num_selected
