@@ -37,7 +37,7 @@ def plot_vectors(wavelengths, metrics, figsize=(8, 6), legend='upper right', fon
     # ------------------------------
     plt.figure(figsize=figsize)
     for algo_name, metric in metrics.items():
-        if algo_name.lower()=='ours':
+        if algo_name=='SS-HSLIE (Ours)':
             plt.plot(wavelengths, metric['psnr'], label=algo_name, linewidth=linewidth, color='red')
         else:
             plt.plot(wavelengths, metric['psnr'], label=algo_name, linewidth=linewidth)
@@ -54,7 +54,7 @@ def plot_vectors(wavelengths, metrics, figsize=(8, 6), legend='upper right', fon
     # ------------------------------
     plt.figure(figsize=figsize)
     for algo_name, metric in metrics.items():
-        if algo_name.lower()=='ours':
+        if algo_name=='SS-HSLIE (Ours)':
             plt.plot(wavelengths, metric['ssim'], label=algo_name, linewidth=linewidth, color='red')
         else:
             plt.plot(wavelengths, metric['ssim'], label=algo_name, linewidth=linewidth)
@@ -98,7 +98,7 @@ if __name__ == '__main__':
 
     # deep hs prior eklenecek. nedense 384 h
     algorithms = {
-        'Ours': {
+        'SS-HSLIE (Ours)': {
             'preds_path': 'D:/results/comparison/ours',
             'labels_path': label_path,
             'matKeyPred': 'ref',
@@ -165,5 +165,5 @@ if __name__ == '__main__':
         font_size=12,
         linewidth=2,
         axes_linewidth=1.2,
-        save_path='C:/Users/medemirhan/Desktop/mdpi/figures'
+        save_path='C:/Users/medemirhan/Desktop/mdpi/figures/results'
         )
