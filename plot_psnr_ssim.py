@@ -2,6 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 from metrics import multi_img_bandwise_metrics
 from utils import select_hsi_wavelengths
+from cycler import cycler
+import itertools
+import random
+import math
+
+random.seed(42)
 
 def get_metrics(algorithms, data_min=None, data_max=None):
     # Pre-compute metrics for all algorithms and store them in a results dictionary.
@@ -23,14 +29,37 @@ def get_metrics(algorithms, data_min=None, data_max=None):
     
     return metrics
 
-def plot_vectors(wavelengths, metrics, figsize=(8, 6), legend='upper right', font_family='serif', font_size=12, linewidth=2, axes_linewidth=1.2, save_path=''):
+def line_color_style_cycler():
+    linestyles = ['-', '--', '-.', ':']
+
+    # Get default matplotlib color cycle
+    default_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    # Generate all color + linestyle combinations
+    style_combinations = list(itertools.product(default_colors, linestyles))
+
+    # Remove the ('r', '-') combo reserved for the first line
+    style_combinations = [combo for combo in style_combinations if combo != ('r', '-')]
+
+    # Shuffle to randomize the order of the combinations
+    random.shuffle(style_combinations)
+
+    # Convert to a cycler
+    custom_cycler = cycler(color=[c for c, l in style_combinations],
+                        linestyle=[l for c, l in style_combinations])
+    
+    return custom_cycler
+
+def plot_vectors(wavelengths, metrics, figsize=None, font_family='serif', font_size=16, linewidth=2, axes_linewidth=1.2, save_path=''):   
+    # Set rcParams with full update
     plt.rcParams.update({
-        'font.family': font_family,
-        'font.size': font_size,
-        'axes.linewidth': axes_linewidth,
+        'font.family': 'serif',
+        'font.size': 12,
+        'axes.linewidth': 1.2,
         'xtick.direction': 'in',
-        'ytick.direction': 'in'
-        })
+        'ytick.direction': 'in',
+        'axes.prop_cycle': line_color_style_cycler()
+    })
 
     # ------------------------------
     # Figure 1: PSNR Plot
@@ -38,16 +67,15 @@ def plot_vectors(wavelengths, metrics, figsize=(8, 6), legend='upper right', fon
     plt.figure(figsize=figsize)
     for algo_name, metric in metrics.items():
         if algo_name=='SS-HSLIE (Ours)':
-            plt.plot(wavelengths, metric['psnr'], label=algo_name, linewidth=linewidth, color='red')
+            plt.plot(wavelengths, metric['psnr'], label=algo_name, linestyle='-', linewidth=linewidth, color='r')
         else:
             plt.plot(wavelengths, metric['psnr'], label=algo_name, linewidth=linewidth)
 
     plt.xlabel("Wavelength (nm)")
     plt.ylabel("PSNR (dB)")
-    plt.grid(True)
-    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=len(metrics)//2+1)
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
     plt.tight_layout()
-    plt.savefig(save_path + "/psnr_vector.eps")
+    plt.savefig(save_path + "/psnr_vector.eps", bbox_inches='tight')
 
     # ------------------------------
     # Figure 2: SSIM Plot
@@ -55,16 +83,15 @@ def plot_vectors(wavelengths, metrics, figsize=(8, 6), legend='upper right', fon
     plt.figure(figsize=figsize)
     for algo_name, metric in metrics.items():
         if algo_name=='SS-HSLIE (Ours)':
-            plt.plot(wavelengths, metric['ssim'], label=algo_name, linewidth=linewidth, color='red')
+            plt.plot(wavelengths, metric['ssim'], label=algo_name, linestyle='-', linewidth=linewidth, color='r')
         else:
             plt.plot(wavelengths, metric['ssim'], label=algo_name, linewidth=linewidth)
 
     plt.xlabel("Wavelength (nm)")
     plt.ylabel("SSIM")
-    plt.grid(True)
-    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=len(metrics)//2+1)
+    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
     plt.tight_layout()
-    plt.savefig(save_path + "/ssim_vector.eps")
+    plt.savefig(save_path + "/ssim_vector.eps", bbox_inches='tight')
 
 if __name__ == '__main__':
     globalMax=1.6697606
@@ -80,21 +107,6 @@ if __name__ == '__main__':
 
     # Dictionary of algorithms with corresponding file paths for PSNR and SSIM calculations.
     label_path = '../PairLIE/data/label_ll'
-
-    '''algorithms = {
-        'Ours': {
-            'preds_path': 'D:/results/comparison/ours',
-            'labels_path': label_path,
-            'matKeyPred': 'ref',
-            'matKeyGt': 'data'
-        },
-        'BM4D': {
-            'preds_path': 'D:/results/comparison/bm4d',
-            'labels_path': label_path,
-            'matKeyPred': 'data',
-            'matKeyGt': 'data'
-        },
-    }'''
 
     # deep hs prior eklenecek. nedense 384 h
     algorithms = {
@@ -160,9 +172,8 @@ if __name__ == '__main__':
         wavelengths=wavelengths,
         metrics=metrics,
         figsize=(12, 8),
-        legend='upper right',
         font_family='serif',
-        font_size=12,
+        font_size=16,
         linewidth=2,
         axes_linewidth=1.2,
         save_path='C:/Users/medemirhan/Desktop/mdpi/figures/results'

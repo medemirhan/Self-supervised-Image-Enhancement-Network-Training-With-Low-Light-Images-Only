@@ -157,7 +157,7 @@ if __name__ == '__main__':
     normalLightMin = 0.0708354
     normalLightMax = 1.7410845
 
-    im_dir = '../denoising/HCANet/results/dim32/*.mat'
+    im_dir = '../Retinexformer/results/HSI/RetinexFormer_HSI/net_g_latest/*.mat'
     label_dir = '../PairLIE/data/label_ll'
 
     avg_psnr, avg_ssim, avg_sam = calc_metrics(
@@ -185,11 +185,11 @@ if __name__ == '__main__':
     sio.savemat('./psnr_vec6.mat', {"data": np.array(psnr_vec)})
     sio.savemat('./ssim_vec6.mat', {"data": np.array(ssim_vec)})'''
 
-    multi_img_bandwise_metrics(
+    '''multi_img_bandwise_metrics(
         preds_path='C:/Users/medemirhan/Desktop/comparison/results/msr/5',
         labels_path='C:/Users/medemirhan/Desktop/n2n/PairLIE/data/label_ll',
         data_min=None,
         data_max=globalMax,
         matKeyPrediction='data',
         matKeyGt='data'
-        )
+        )'''
