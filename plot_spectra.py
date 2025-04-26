@@ -6,8 +6,55 @@ from cycler import cycler
 import itertools
 import random
 import math
+import string
 
 random.seed(42)
+
+def visualize_hsi_false_color(HSI, wave_start_nm, wave_end_nm, normalize=False):
+    """
+    Create a false-color RGB image from a hyperspectral cube.
+    
+    Parameters
+    ----------
+    HSI : numpy.ndarray
+        Hyperspectral image cube of shape (height, width, bands).
+    wave_start_nm : float
+        Wavelength (nm) corresponding to band index 0.
+    wave_end_nm : float
+        Wavelength (nm) corresponding to band index -1.
+    normalize : bool, optional
+        If True, each channel is scaled to [0,1]. Default is False.
+        
+    Returns
+    -------
+    rgb : numpy.ndarray
+        False-color RGB image of shape (height, width, 3).
+    """
+    # number of bands and their wavelengths
+    bands = HSI.shape[2]
+    wavelengths = np.linspace(wave_start_nm, wave_end_nm, bands)
+    
+    # find band indices closest to target wavelengths
+    idx_nir   = np.argmin(np.abs(wavelengths - 800))
+    idx_red   = np.argmin(np.abs(wavelengths - 670))
+    idx_green = np.argmin(np.abs(wavelengths - 550))
+    
+    # extract each channel
+    R = HSI[:, :, idx_nir]
+    G = HSI[:, :, idx_red]
+    B = HSI[:, :, idx_green]
+    
+    if normalize:
+        # scale each channel to [0,1]
+        def norm(channel):
+            cmin, cmax = channel.min(), channel.max()
+            return (channel - cmin) / (cmax - cmin) if cmax > cmin else channel
+        R, G, B = norm(R), norm(G), norm(B)
+    
+    # stack into an RGB image
+    rgb = np.stack([R, G, B], axis=-1)
+    
+    return rgb
 
 def line_color_style_cycler():
     linestyles = ['-', '--', '-.', ':']
@@ -58,6 +105,8 @@ if __name__ == '__main__':
     y_locs = [310, 190, 240, 200]
     window_size = 5  # must be an odd number
     sample_band = 20  # MATLAB index (1-indexed); will subtract one for Python (0-indexed)
+    waveStart_nm = 453.8117
+    waveEnd_nm = 962.3318
 
     # Load data
     # Load the first hyperspectral image to get its dimensions.
@@ -91,6 +140,8 @@ if __name__ == '__main__':
 
         # Extract the i-th image of shape (h, w, c)
         cur_data = data_array[i, :, :, :]
+
+        rgb_data = visualize_hsi_false_color(cur_data, waveStart_nm, waveEnd_nm, normalize=False)
         
         plt.rcParams.update({
             'font.family': 'serif',
@@ -102,7 +153,8 @@ if __name__ == '__main__':
 
         plt.figure(figsize=(8, 6))
         # Display the selected spectral band (subtract one for 0-index)
-        plt.imshow(cur_data[:, :, sample_band - 1], cmap='gray')
+        #plt.imshow(cur_data[:, :, sample_band - 1], cmap='gray')
+        plt.imshow(rgb_data)
         plt.axis('off')
         
         # For the first image, overlay red circles and text at given locations.
@@ -110,17 +162,19 @@ if __name__ == '__main__':
             # Adjust coordinates: MATLAB indices are 1-based, so subtract 1 for Python array coordinates.
             x_coords = np.array(x_locs) - 1
             y_coords = np.array(y_locs) - 1
+            letters = string.ascii_lowercase  # 'abcdefghijklmnopqrstuvwxyz'
             
             # Plot red circles.
             plt.plot(x_coords, y_coords, 'ro', markersize=8, linewidth=2)
             
             # Add text labels near the points.
-            for (x, y) in zip(x_coords, y_coords):
+            for j, (x, y) in enumerate(zip(x_coords, y_coords)):
+                letter = letters[j]
                 # Offset the text (adjust as necessary)
                 plt.text(
                     x + 5,
                     y - 5,
-                    f'[{x+1}, {y+1}]',
+                    f'({letter}) [{x+1}, {y+1}]',
                     color='blue',
                     fontsize=10,
                     weight='bold',
