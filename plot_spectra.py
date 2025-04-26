@@ -216,7 +216,7 @@ if __name__ == '__main__':
 
         plt.rcParams.update({
             'font.family': 'serif',
-            'font.size': 12,
+            'font.size': 13,
             'axes.linewidth': 1.2,
             'xtick.direction': 'in',
             'ytick.direction': 'in',
@@ -239,13 +239,13 @@ if __name__ == '__main__':
             # Sum over the first two axes then divide by (window_size**2)
             spectrum = np.sum(window, axis=(0, 1)) / (window_size ** 2)
             if data_to_compare[j]["label"]=="SS-HSLIE (Ours)":
-                plt.plot(spectrum, linewidth=2, color='r', linestyle='-')
+                plt.plot(spectrum, linewidth=3, color='r', linestyle='-')
             elif data_to_compare[j]["label"]=="Ground Truth":
-                plt.plot(spectrum, linewidth=2, color='b', linestyle='-')
+                plt.plot(spectrum, linewidth=3, color='b', linestyle='-')
             elif data_to_compare[j]["label"]=="Low-light":
-                plt.plot(spectrum, linewidth=2, color='g', linestyle='--')
+                plt.plot(spectrum, linewidth=3, color='g', linestyle='--')
             else:
-                plt.plot(spectrum, linewidth=1.1)
+                plt.plot(spectrum, linewidth=2)
             legend_labels.append(data_to_compare[j]["label"])
         
         plt.xlabel('Band Number')
