@@ -50,12 +50,12 @@ def line_color_style_cycler():
     
     return custom_cycler
 
-def plot_vectors(wavelengths, metrics, figsize=None, font_family='serif', font_size=16, linewidth=2, axes_linewidth=1.2, save_path=''):   
+def plot_vectors(wavelengths, metrics, figsize=None, font_family='serif', font_size=12, linewidth=2, axes_linewidth=1.2, save_path=''):   
     # Set rcParams with full update
     plt.rcParams.update({
-        'font.family': 'serif',
-        'font.size': 12,
-        'axes.linewidth': 1.2,
+        'font.family': font_family,
+        'font.size': font_size,
+        'axes.linewidth': axes_linewidth,
         'xtick.direction': 'in',
         'ytick.direction': 'in',
         'axes.prop_cycle': line_color_style_cycler()
@@ -72,7 +72,7 @@ def plot_vectors(wavelengths, metrics, figsize=None, font_family='serif', font_s
             plt.plot(wavelengths, metric['psnr'], label=algo_name, linewidth=linewidth)
 
     plt.xlabel("Wavelength (nm)")
-    plt.ylabel("PSNR (dB)")
+    plt.ylabel("MPSNR (dB)")
     plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
     plt.tight_layout()
     plt.savefig(save_path + "/psnr_vector.eps", bbox_inches='tight')
@@ -88,7 +88,7 @@ def plot_vectors(wavelengths, metrics, figsize=None, font_family='serif', font_s
             plt.plot(wavelengths, metric['ssim'], label=algo_name, linewidth=linewidth)
 
     plt.xlabel("Wavelength (nm)")
-    plt.ylabel("SSIM")
+    plt.ylabel("MSSIM")
     plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
     plt.tight_layout()
     plt.savefig(save_path + "/ssim_vector.eps", bbox_inches='tight')
@@ -173,8 +173,8 @@ if __name__ == '__main__':
         metrics=metrics,
         figsize=(12, 8),
         font_family='serif',
-        font_size=16,
-        linewidth=2,
+        font_size=15,
+        linewidth=3,
         axes_linewidth=1.2,
         save_path='C:/Users/medemirhan/Desktop/mdpi/figures/results'
         )
