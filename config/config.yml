@@ -29,3 +29,4 @@ c_loss_fourier: 0.2
 c_loss_spectral_cons: 1
 save_reflectance: false
 save_illumination: false
+save_i_delta: false

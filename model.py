@@ -319,7 +319,7 @@ class LowLightEnhance(nn.Module):
         
         mlflow.log_param('model_path', os.path.normpath(os.path.join(ckpt_dir, "model_epoch_latest.pth")))
     
-    def test_model(self, model_dir, test_low_data, test_low_data_names, save_dir, save_reflectance=False, save_illumination=False):
+    def test_model(self, model_dir, test_low_data, test_low_data_names, save_dir, save_reflectance=False, save_illumination=False, save_i_delta=False):
         self.load_checkpoint(os.path.join(model_dir, 'model_epoch_latest.pth'))
         self.eval()
         total_run_time = 0.0
@@ -344,6 +344,9 @@ class LowLightEnhance(nn.Module):
                 if save_illumination:
                     I_np = I_low.squeeze(0).permute(1, 2, 0).cpu().numpy()
                     save_hsi(os.path.join(save_dir, filename.split('.')[0] + '_I_low.mat'), I_np)
+                if save_i_delta:
+                    I_delta_np = I_delta.squeeze(0).permute(1, 2, 0).cpu().numpy()
+                    save_hsi(os.path.join(save_dir, filename.split('.')[0] + '_I_delta.mat'), I_delta_np)
 
                 print(f"Processed {filename} in {run_time:.4f} seconds.")
             avg_run_time = total_run_time / len(test_low_data) if len(test_low_data) > 0 else 0

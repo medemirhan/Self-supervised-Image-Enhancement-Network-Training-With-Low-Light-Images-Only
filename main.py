@@ -44,7 +44,8 @@ def test(model, args):
         test_low_data_names=test_low_data_name, 
         save_dir=args.test_result_dir,
         save_reflectance=args.save_reflectance,
-        save_illumination=args.save_illumination
+        save_illumination=args.save_illumination,
+        save_i_delta=args.save_i_delta
         )
 
 def eval_metrics(args):
@@ -154,6 +155,7 @@ if __name__ == '__main__':
     args.timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
     args.save_reflectance = False
     args.save_illumination = False
+    args.save_i_delta = False
 
     # Data related args
     args.dataset_type = 'indoor'
