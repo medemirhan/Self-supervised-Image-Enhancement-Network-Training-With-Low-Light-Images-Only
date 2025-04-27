@@ -88,8 +88,7 @@ if __name__ == '__main__':
         {"path": r"D:\results\comparison\low\buildingblock.mat",    "key": "data", "label": "Low-light"},
         {"path": r"D:\results\comparison\bm4d\buildingblock.mat",    "key": "data", "label": "BM4D"},
         {"path": r"D:\results\comparison\clahe\buildingblock.mat",   "key": "data", "label": "CLAHE"},
-        # The following line was commented out in MATLAB:
-        # {"path": r"D:\results\comparison\deep_hs_prior\buildingblock.mat", "key": "pred", "label": "Deep HS Prior"},
+        {"path": r"D:\results\comparison\deep_hs_prior\buildingblock.mat", "key": "pred", "label": "DeepHS Pr."},
         {"path": r"D:\results\comparison\fast_hy_mix\buildingblock.mat", "key": "data", "label": "FastHyMix"},
         {"path": r"D:\results\comparison\hcanet\buildingblock.mat",       "key": "data", "label": "HCANet"},
         {"path": r"D:\results\comparison\he\buildingblock.mat",           "key": "data", "label": "HE"},
@@ -197,6 +196,15 @@ if __name__ == '__main__':
         plt.savefig(os.path.join(save_path, filename), dpi=300, bbox_inches='tight')
         plt.close()
 
+    plt.rcParams.update({
+        'font.family': 'serif',
+        'font.size': 13,
+        'axes.linewidth': 1.2,
+        'xtick.direction': 'in',
+        'ytick.direction': 'in',
+        'axes.prop_cycle': line_color_style_cycler()
+    })
+    
     # Plot spectra (Each plot is saved separately)
     # For each (x,y) location, compute the local spectrum across all algorithms.
     # Create one figure per (x,y) location.
@@ -213,18 +221,9 @@ if __name__ == '__main__':
         # For y direction:
         y_start = max(0, y_loc - window_size // 2)
         y_end = min(h, y_start + window_size)
-
-        plt.rcParams.update({
-            'font.family': 'serif',
-            'font.size': 13,
-            'axes.linewidth': 1.2,
-            'xtick.direction': 'in',
-            'ytick.direction': 'in',
-            'axes.prop_cycle': line_color_style_cycler()
-        })
         
         # Create a new figure for this spectrum.
-        plt.figure(figsize=(12, 8))
+        plt.figure(figsize=(14, 9))
         
         # Prepare a list to collect labels for the legend.
         legend_labels = []

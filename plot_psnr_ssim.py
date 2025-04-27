@@ -108,7 +108,6 @@ if __name__ == '__main__':
     # Dictionary of algorithms with corresponding file paths for PSNR and SSIM calculations.
     label_path = '../PairLIE/data/label_ll'
 
-    # deep hs prior eklenecek. nedense 384 h
     algorithms = {
         'SS-HSLIE (Ours)': {
             'preds_path': 'D:/results/comparison/ours',
@@ -158,6 +157,18 @@ if __name__ == '__main__':
             'matKeyPred': 'data',
             'matKeyGt': 'data'
         },
+        'CLAHE': {
+            'preds_path': 'D:/results/comparison/clahe',
+            'labels_path': label_path,
+            'matKeyPred': 'data',
+            'matKeyGt': 'data'
+        },
+        'DeepHS Pr.': {
+            'preds_path': 'D:/results/comparison/deep_hs_prior',
+            'labels_path': label_path,
+            'matKeyPred': 'pred',
+            'matKeyGt': 'data'
+        },
         'RetinexNet': {
             'preds_path': 'D:/results/comparison/retinexnet',
             'labels_path': label_path,
@@ -171,7 +182,7 @@ if __name__ == '__main__':
     plot_vectors(
         wavelengths=wavelengths,
         metrics=metrics,
-        figsize=(12, 8),
+        figsize=(14, 9),
         font_family='serif',
         font_size=15,
         linewidth=3,
