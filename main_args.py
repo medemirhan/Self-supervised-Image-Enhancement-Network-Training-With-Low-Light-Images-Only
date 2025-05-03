@@ -14,7 +14,7 @@ from metrics import calc_metrics
 def parse_args():
     # Use default=None so we can detect if the user provided a value.
     parser = argparse.ArgumentParser(description="Parse config from YAML and command-line.")
-    parser.add_argument('--config', type=str, default='./config/config.yml')
+    parser.add_argument('--config', type=str, default='./config/config_indoor.yml')
     parser.add_argument('--model_name', type=str, default=None)
     parser.add_argument('--train_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/train')
     parser.add_argument('--eval_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/eval')
