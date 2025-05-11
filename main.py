@@ -1,4 +1,6 @@
 import os
+import argparse
+import yaml
 from glob import glob
 import numpy as np
 import random
@@ -8,6 +10,70 @@ import mlflow
 from model import LowLightEnhance
 from utils import load_hsi, Struct
 from metrics import calc_metrics
+
+def parse_args():
+    # Use default=None so we can detect if the user provided a value.
+    parser = argparse.ArgumentParser(description="Parse config from YAML and command-line.")
+    parser.add_argument('--config', type=str, default='./config/config_indoor.yml')
+    parser.add_argument('--use_gpu', type=int, default=1)
+    parser.add_argument('--seed_value', type=int, default=41)
+    parser.add_argument('--gpu_idx', type=str, default='0')
+    parser.add_argument('--gpu_mem', type=float, default=0.8)
+    parser.add_argument('--decom', type=int, default=0)
+    parser.add_argument('--mat_key', type=str, default='data')
+    parser.add_argument('--channels', type=int, default=64)
+    parser.add_argument('--global_min', type=float, default=0.)
+    parser.add_argument('--global_max', type=float, default=1.)
+    parser.add_argument('--normalization', type=str, default='global_normalization')
+    parser.add_argument('--batch_size', type=int, default=1)
+    parser.add_argument('--patch_size', type=int, default=128)
+    parser.add_argument('--start_lr', type=float, default=0.001)
+    parser.add_argument('--lr_update_factor', type=int, default=1)
+    parser.add_argument('--lr_update_period', type=int, default=400)
+    parser.add_argument('--train_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/train')
+    parser.add_argument('--eval_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/eval')
+    parser.add_argument('--test_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/test')
+    parser.add_argument('--label_dir', type=str, default='../PairLIE/data/label_ll')
+    parser.add_argument('--phase', type=str, default='train_and_test')
+    parser.add_argument('--epoch', type=int, default=400)
+    parser.add_argument('--eval_every_epoch', type=int, default=200)
+    parser.add_argument('--plot_every_epoch', type=int, default=200)
+    parser.add_argument('--c_loss_reconstruction', type=float, default=10.)
+    parser.add_argument('--c_loss_r_fidelity', type=float, default=1.)
+    parser.add_argument('--c_loss_i_smooth_low', type=float, default=1.)
+    parser.add_argument('--c_loss_i_smooth_delta', type=float, default=20.)
+    parser.add_argument('--c_loss_fourier', type=float, default=0.2)
+    parser.add_argument('--c_loss_spectral_cons', type=float, default=1.)
+    parser.add_argument('--save_reflectance', type=bool, default=False)
+    parser.add_argument('--save_illumination', type=bool, default=False)
+    parser.add_argument('--save_i_delta', type=bool, default=False)
+    parser.add_argument('--model_name', type=str, default=None)
+
+    args = parser.parse_args()
+    
+    # Load the YAML configuration.
+    with open(args.config, 'r') as file:
+        config_data = yaml.safe_load(file)
+    
+    # For each key in the YAML file, set the attribute on args if not already provided.
+    for key, value in config_data.items():
+        # If the argument was not provided on the command line, assign the YAML value.
+        if getattr(args, key, None) is None:
+            setattr(args, key, value)
+    
+    args.timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
+    if args.phase == 'test':
+        args.timestamp = '' # enter timestamp manually
+
+    # Don't change
+    args.full_model_name = args.model_name + '_' + args.timestamp
+    args.model_ckpt_dir = './checkpoint/' + args.model_name
+    args.eval_result_dir = 'D:/sslie/eval_results_' + args.full_model_name
+    args.test_result_dir = 'D:/sslie/test_results_' + args.full_model_name
+    args.test_model_dir = './checkpoint/' + args.model_name + '/Decom_' + args.timestamp
+    args.log_file_path = './logs/' + args.full_model_name + '.log'
+    
+    return args
 
 def train(model, args):
     model.train_model(
@@ -66,6 +132,11 @@ def eval_metrics(args):
     mlflow.log_metric("SAM", avg_sam.item())
 
 def main(args):
+    print("------ PARAMETERS ------")
+    for arg, value in vars(args).items():
+        print(f"{arg} : {value}")
+    print("------------------------")
+
     # Set random seeds for reproducibility
     random.seed(args.seed_value)
     np.random.seed(args.seed_value)
@@ -120,6 +191,7 @@ def main(args):
         mlflow.log_artifact('utils.py')
         mlflow.log_artifact('metrics.py')
         mlflow.log_artifact('main_args.py')
+        mlflow.log_artifact(args.config)
         
         if args.phase == 'train':
             mlflow.log_param('data_train', args.train_data)
@@ -139,75 +211,10 @@ def main(args):
             exit(0)
 
 if __name__ == '__main__':
-    args = Struct()
-
-    indoor_min = 0.0708354
-    indoor_max = 1.6697606
-    outdoor_min = 0.1167562
-    outdoor_max = 1.7410845
-
-    # Common args
-    args.use_gpu = 1
-    args.seed_value = 41
-    args.gpu_idx = '0'
-    args.gpu_mem = float(0.8)
-    args.decom = 0
-    args.timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
-    args.save_reflectance = False
-    args.save_illumination = False
-    args.save_i_delta = False
-
-    # Data related args
-    args.dataset_type = 'indoor'
-    args.mat_key = 'data'
-    args.normalization = 'global_normalization'
-    args.channels = 64
-
-    if args.dataset_type == 'indoor':
-        args.global_min = indoor_min
-        args.global_max = indoor_max
-    elif args.dataset_type == 'outdoor':
-        args.global_min = outdoor_min
-        args.global_max = outdoor_max
-    elif args.dataset_type == 'combined':
-        args.global_min = min(indoor_min, outdoor_min)
-        args.global_max = min(indoor_max, outdoor_max)
-    else:
-        raise NotImplementedError('Dataset type ' + args.dataset_type + ' is not implemented.')
-
-    args.c_loss_reconstruction = 10
-    args.c_loss_r_fidelity = 1
-    args.c_loss_i_smooth_low = 1
-    args.c_loss_i_smooth_delta = 20
-    args.c_loss_fourier = 0.2
-    args.c_loss_spectral_cons = 1
-
-    args.batch_size = 1
-    args.patch_size = 128
-    args.start_lr = 1e-3
-    args.lr_update_factor = 1
-    args.lr_update_period = 400
-
-    # Change if necessary
-    args.train_data = '../PairLIE/data/hsi_dataset_indoor_only/train'
-    args.eval_data = '../PairLIE/data/hsi_dataset_indoor_only/eval'
-    args.test_data = '../PairLIE/data/hsi_dataset_indoor_only/test'
-    args.label_dir = '../PairLIE/data/label_ll'
-    args.model_name = 'torch_exp'
-    args.phase = 'train_and_test'
-    args.epoch = 400
-    args.eval_every_epoch = 200
-    args.plot_every_epoch = 200
-
-    if args.phase == 'test':
-        args.timestamp = '' # enter timestamp manually
-
-    # Don't change
-    args.full_model_name = args.model_name + '_' + args.timestamp
-    args.model_ckpt_dir = './checkpoint/' + args.model_name
-    args.eval_result_dir = 'D:/sslie/eval_results_' + args.full_model_name
-    args.test_result_dir = 'D:/sslie/test_results_' + args.full_model_name
-    args.test_model_dir = './checkpoint/' + args.model_name + '/Decom_' + args.timestamp
-    args.log_file_path = './logs/' + args.full_model_name + '.log'
-
+    args = parse_args()
     main(args)
+    print("Job finished...")
+    '''
+    Sample Usage:
+        python main_args.py --model_name "baseline" --coeff_recon_loss_low 10 --coeff_Ismooth_loss_low 1 --coeff_recon_loss_low_eq 1 --coeff_R_low_loss_smooth 1 --coeff_relight_loss 0.2 --coeff_Ismooth_loss_delta 20 --coeff_fourier_loss 0.2 --coeff_spectral_loss 1
+    '''
