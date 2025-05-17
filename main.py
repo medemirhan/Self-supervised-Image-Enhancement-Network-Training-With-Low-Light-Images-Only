@@ -193,6 +193,13 @@ def main(args):
         mlflow.log_param('patch_size', args.patch_size)
         mlflow.log_param('model_name', args.full_model_name)
 
+        mlflow.log_param('c_loss_reconstruction', args.c_loss_reconstruction)
+        mlflow.log_param('c_loss_r_fidelity', args.c_loss_r_fidelity)
+        mlflow.log_param('c_loss_i_smooth_low', args.c_loss_i_smooth_low)
+        mlflow.log_param('c_loss_i_smooth_delta', args.c_loss_i_smooth_delta)
+        mlflow.log_param('c_loss_fourier', args.c_loss_fourier)
+        mlflow.log_param('c_loss_spectral_cons', args.c_loss_spectral_cons)
+
         mlflow.log_artifact('main.py')
         mlflow.log_artifact('model.py')
         mlflow.log_artifact('utils.py')
