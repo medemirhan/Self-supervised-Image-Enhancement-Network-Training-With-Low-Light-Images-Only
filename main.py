@@ -191,6 +191,7 @@ def main(args):
         mlflow.log_param('data_max', args.global_max)
         mlflow.log_param('seed', args.seed_value)
         mlflow.log_param('patch_size', args.patch_size)
+        mlflow.log_param('model_name', args.full_model_name)
 
         mlflow.log_artifact('main.py')
         mlflow.log_artifact('model.py')
