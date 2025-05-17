@@ -12,54 +12,60 @@ from utils import load_hsi, Struct
 from metrics import calc_metrics
 
 def parse_args():
-    # Use default=None so we can detect if the user provided a value.
+    default_values = {
+        'use_gpu': 1,
+        'seed_value': 41,
+        'gpu_idx': '0',
+        'gpu_mem': 0.8,
+        'decom': 0,
+        'mat_key': 'data',
+        'channels': 64,
+        'global_min': 0.,
+        'global_max': 1.,
+        'normalization': 'global_normalization',
+        'batch_size': 1,
+        'patch_size': 128,
+        'start_lr': 0.001,
+        'lr_update_factor': 1,
+        'lr_update_period': 400,
+        'train_data': '../PairLIE/data/hsi_dataset_indoor_only/train',
+        'eval_data': '../PairLIE/data/hsi_dataset_indoor_only/eval',
+        'test_data': '../PairLIE/data/hsi_dataset_indoor_only/test',
+        'label_dir': '../PairLIE/data/label_ll',
+        'phase': 'train_and_test',
+        'epoch': 400,
+        'eval_every_epoch': 200,
+        'plot_every_epoch': 200,
+        'c_loss_reconstruction': 10.,
+        'c_loss_r_fidelity': 1.,
+        'c_loss_i_smooth_low': 1.,
+        'c_loss_i_smooth_delta': 20.,
+        'c_loss_fourier': 0.2,
+        'c_loss_spectral_cons': 1.,
+        'save_reflectance': False,
+        'save_illumination': False,
+        'save_i_delta': False,
+        'model_name': 'no_name_model'
+    }
+
     parser = argparse.ArgumentParser(description="Parse config from YAML and command-line.")
     parser.add_argument('--config', type=str, default='./config/config_indoor.yml')
-    parser.add_argument('--use_gpu', type=int, default=1)
-    parser.add_argument('--seed_value', type=int, default=41)
-    parser.add_argument('--gpu_idx', type=str, default='0')
-    parser.add_argument('--gpu_mem', type=float, default=0.8)
-    parser.add_argument('--decom', type=int, default=0)
-    parser.add_argument('--mat_key', type=str, default='data')
-    parser.add_argument('--channels', type=int, default=64)
-    parser.add_argument('--global_min', type=float, default=0.)
-    parser.add_argument('--global_max', type=float, default=1.)
-    parser.add_argument('--normalization', type=str, default='global_normalization')
-    parser.add_argument('--batch_size', type=int, default=1)
-    parser.add_argument('--patch_size', type=int, default=128)
-    parser.add_argument('--start_lr', type=float, default=0.001)
-    parser.add_argument('--lr_update_factor', type=int, default=1)
-    parser.add_argument('--lr_update_period', type=int, default=400)
-    parser.add_argument('--train_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/train')
-    parser.add_argument('--eval_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/eval')
-    parser.add_argument('--test_data', type=str, default='../PairLIE/data/hsi_dataset_indoor_only/test')
-    parser.add_argument('--label_dir', type=str, default='../PairLIE/data/label_ll')
-    parser.add_argument('--phase', type=str, default='train_and_test')
-    parser.add_argument('--epoch', type=int, default=400)
-    parser.add_argument('--eval_every_epoch', type=int, default=200)
-    parser.add_argument('--plot_every_epoch', type=int, default=200)
-    parser.add_argument('--c_loss_reconstruction', type=float, default=10.)
-    parser.add_argument('--c_loss_r_fidelity', type=float, default=1.)
-    parser.add_argument('--c_loss_i_smooth_low', type=float, default=1.)
-    parser.add_argument('--c_loss_i_smooth_delta', type=float, default=20.)
-    parser.add_argument('--c_loss_fourier', type=float, default=0.2)
-    parser.add_argument('--c_loss_spectral_cons', type=float, default=1.)
-    parser.add_argument('--save_reflectance', type=bool, default=False)
-    parser.add_argument('--save_illumination', type=bool, default=False)
-    parser.add_argument('--save_i_delta', type=bool, default=False)
-    parser.add_argument('--model_name', type=str, default=None)
+
+    # Add rest with default=None
+    for key, val in default_values.items():
+        parser.add_argument(f'--{key}', type=type(val), default=None)
 
     args = parser.parse_args()
     
-    # Load the YAML configuration.
+    # Load config from YAML
     with open(args.config, 'r') as file:
         config_data = yaml.safe_load(file)
-    
-    # For each key in the YAML file, set the attribute on args if not already provided.
-    for key, value in config_data.items():
-        # If the argument was not provided on the command line, assign the YAML value.
-        if getattr(args, key, None) is None:
-            setattr(args, key, value)
+
+    # Apply priorities: CLI > YAML > Default
+    for key, default_val in default_values.items():
+        current_val = getattr(args, key)
+        if current_val is None:
+            setattr(args, key, config_data.get(key, default_val))
     
     args.timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
     if args.phase == 'test':
