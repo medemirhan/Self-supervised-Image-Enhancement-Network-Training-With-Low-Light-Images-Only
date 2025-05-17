@@ -190,7 +190,7 @@ def main(args):
         mlflow.log_artifact('model.py')
         mlflow.log_artifact('utils.py')
         mlflow.log_artifact('metrics.py')
-        mlflow.log_artifact('main_args.py')
+        mlflow.log_artifact('main.py')
         mlflow.log_artifact(args.config)
         
         if args.phase == 'train':
