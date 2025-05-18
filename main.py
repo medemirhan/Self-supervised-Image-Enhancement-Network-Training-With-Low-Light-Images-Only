@@ -42,6 +42,8 @@ def parse_args():
         'c_loss_i_smooth_delta': 20.,
         'c_loss_fourier': 0.2,
         'c_loss_spectral_cons': 1.,
+        'alpha_i_smooth_low': 1.,
+        'alpha_i_smooth_delta': 10.,
         'save_reflectance': False,
         'save_illumination': False,
         'save_i_delta': False,
@@ -168,6 +170,8 @@ def main(args):
         c_loss_i_smooth_delta=args.c_loss_i_smooth_delta,
         c_loss_fourier=args.c_loss_fourier,
         c_loss_spectral_cons=args.c_loss_spectral_cons,
+        alpha_i_smooth_low=args.alpha_i_smooth_low,
+        alpha_i_smooth_delta=args.alpha_i_smooth_delta,
         device=device
     )
     
@@ -199,6 +203,8 @@ def main(args):
         mlflow.log_param('c_loss_i_smooth_delta', args.c_loss_i_smooth_delta)
         mlflow.log_param('c_loss_fourier', args.c_loss_fourier)
         mlflow.log_param('c_loss_spectral_cons', args.c_loss_spectral_cons)
+        mlflow.log_param('alpha_i_smooth_low', args.alpha_i_smooth_low)
+        mlflow.log_param('alpha_i_smooth_delta', args.alpha_i_smooth_delta)
 
         mlflow.log_artifact('main.py')
         mlflow.log_artifact('model.py')

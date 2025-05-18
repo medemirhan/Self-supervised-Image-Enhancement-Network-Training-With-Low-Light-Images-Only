@@ -177,7 +177,8 @@ class RelightNet(nn.Module):
 class LowLightEnhance(nn.Module):
     def __init__(self, input_channels=64, lr=1e-3, lr_update_factor=1, lr_update_period=None, time_stamp=None, 
                  c_loss_reconstruction=10, c_loss_r_fidelity=1, c_loss_i_smooth_low=1, c_loss_i_smooth_delta=20,
-                 c_loss_fourier=0.2, c_loss_spectral_cons=1, device=torch.device("cpu")):
+                 c_loss_fourier=0.2, c_loss_spectral_cons=1, alpha_i_smooth_low=1, alpha_i_smooth_delta=10,
+                 device=torch.device("cpu")):
         super(LowLightEnhance, self).__init__()
         self.input_channels = input_channels
         self.device = device
@@ -188,6 +189,8 @@ class LowLightEnhance(nn.Module):
         self.c_loss_i_smooth_delta = c_loss_i_smooth_delta
         self.c_loss_fourier = c_loss_fourier
         self.c_loss_spectral_cons = c_loss_spectral_cons
+        self.alpha_i_smooth_low = alpha_i_smooth_low
+        self.alpha_i_smooth_delta = alpha_i_smooth_delta
         self.lr = lr
         self.lr_update_factor = lr_update_factor
         self.lr_update_period = lr_update_period
@@ -466,10 +469,13 @@ class LowLightEnhance(nn.Module):
     def compute_loss(self, input_low, input_high):
         R_low, I_low, I_delta, S = self.forward(input_low)
         R_enh, I_enh = self.decom_net(S)
+
+        alpha1 = self.alpha_i_smooth_low
+        alpha2 = self.alpha_i_smooth_delta
         
         L_reconstruction = torch.mean(torch.abs(R_low * I_low - input_high))
-        L_I_smooth_low, L_R_fidelity = self.structure_aware_loss(R_low, I_low, R_enh, alpha=1.0, beta=0.5, lambda_I=1.0, lambda_R=1.0)
-        L_I_smooth_delta = self.smooth_loss(I_delta, R_low, alpha=10)
+        L_I_smooth_low, L_R_fidelity = self.structure_aware_loss(R_low, I_low, R_enh, alpha=alpha1, beta=0.5, lambda_I=1.0, lambda_R=1.0)
+        L_I_smooth_delta = self.smooth_loss(I_delta, R_low, alpha=alpha2)
         L_fourier = self.fourier_spectrum_loss(input_low, S, cutoff=0.1, loss_type="l1")
         L_spectral_cons = self.spectral_smoothness_loss(S, loss_type="l1")
         

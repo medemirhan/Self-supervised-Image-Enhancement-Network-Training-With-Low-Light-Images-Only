@@ -27,6 +27,8 @@ c_loss_i_smooth_low: 1
 c_loss_i_smooth_delta: 20
 c_loss_fourier: 0.2
 c_loss_spectral_cons: 1
+alpha_i_smooth_low: 1
+alpha_i_smooth_delta: 10
 save_reflectance: false
 save_illumination: false
 save_i_delta: false
