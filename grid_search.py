@@ -5,12 +5,14 @@ import os
 
 # Define parameter grid
 param_grid = {
-    'c_loss_reconstruction': [1, 0.1],
-    'c_loss_r_fidelity': [10000, 500],
-    'c_loss_i_smooth_low': [1000000, 1000],
-    'c_loss_i_smooth_delta': [100, 10000],
-    'c_loss_fourier': [0.05, 1],
-    'c_loss_spectral_cons': [100, 10],
+    'c_loss_reconstruction': [1, 0.1, 50],
+    'c_loss_r_fidelity': [10000, 1, 500],
+    'c_loss_i_smooth_low': [1000000, 1, 1000],
+    'c_loss_i_smooth_delta': [100, 5, 10000],
+    'c_loss_fourier': [0.05, 0.20, 10],
+    'c_loss_spectral_cons': [100, 1, 50],
+    'alpha_i_smooth_low': [1, 0.1, 20],
+    'alpha_i_smooth_delta': [10, 1, 0.1],
 }
 
 # Path to the base config file
@@ -38,7 +40,7 @@ for idx, combo in enumerate(itertools.product(*values)):
         subprocess.run([
             'python', 'main.py',
             '--config', config_path,
-            '--model_name', 'outdoor_grid_search'
+            '--model_name', 'outdoor_grid_search2'
         ], check=True)
     finally:
         os.remove(config_path)

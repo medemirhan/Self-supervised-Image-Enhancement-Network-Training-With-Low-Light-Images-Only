@@ -94,14 +94,14 @@ def plot_vectors(wavelengths, metrics, figsize=None, font_family='serif', font_s
     plt.savefig(save_path + "/ssim_vector.eps", bbox_inches='tight')
 
 if __name__ == '__main__':
-    globalMax=1.6697606
+    globalMax=1.7410845
 
     wavelengths, num_bands = select_hsi_wavelengths(
         range_start=400,
         range_end=1000,
-        total_channels=224,
-        d_head=20,
-        d_tail=12,
+        total_channels=204,
+        d_head=6,
+        d_tail=6,
         s=3
         )
 

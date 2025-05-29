@@ -69,12 +69,14 @@ def parse_args():
         if current_val is None:
             setattr(args, key, config_data.get(key, default_val))
     
+    postfix = ''
     args.timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
     if args.phase == 'test':
-        args.timestamp = '' # enter timestamp manually
+        args.timestamp = '20250404_014943' # enter timestamp manually
+        postfix = 'test'
 
     # Don't change
-    args.full_model_name = args.model_name + '_' + args.timestamp
+    args.full_model_name = args.model_name + '_' + args.timestamp + postfix
     args.model_ckpt_dir = './checkpoint/' + args.model_name
     args.eval_result_dir = 'D:/sslie/eval_results_' + args.full_model_name
     args.test_result_dir = 'D:/sslie/test_results_' + args.full_model_name

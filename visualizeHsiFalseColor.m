@@ -25,6 +25,13 @@ function falseColorImage = visualizeHsiFalseColor(HSI, waveStart_nm, waveEnd_nm,
         R = mat2gray(R);
         G = mat2gray(G);
         B = mat2gray(B);
+%         R = R/max(R(:));
+%         G = G/max(G(:));
+%         B = B/max(B(:));
+%        %--- percentile contrast stretch --------------------------------------
+%        R = pctStretch(R,5,95,'true');
+%        G = pctStretch(G,5,95,'true');
+%        B = pctStretch(B,5,95,'true');
     end
 
     % Combine into RGB image

@@ -1,17 +1,16 @@
 clear all
-close all
 clc
 
 %% Settings
-imname         = 'vegatables5';
-imdir          = 'D:\results\comparison\low\';
-algo           = 'low';
-savepath       = 'C:\Users\medemirhan\Desktop\mdpi\figures\dataset';
+imname         = '007_2_2021-01-20_024';
+imdir          = 'D:\results\comparison\ours\';
+algo           = 'ours';
+savepath       = 'C:\Users\medemirhan\Desktop\jstsp\figures\results';
 %showBand       = 20;
-waveStart_nm   = 453.8117;
-waveEnd_nm     = 962.3318;
+waveStart_nm   = 417.73399;
+waveEnd_nm     = 976.35468;
 imname_postfix = '_falseColor';
-key            = 'data';
+key            = 'ref';
 
 %% Load and Prepare Image
 impath = fullfile(imdir, strcat(imname, '.mat'));
