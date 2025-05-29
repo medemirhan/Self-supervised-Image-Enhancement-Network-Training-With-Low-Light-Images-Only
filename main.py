@@ -47,7 +47,9 @@ def parse_args():
         'save_reflectance': False,
         'save_illumination': False,
         'save_i_delta': False,
-        'model_name': 'no_name_model'
+        'model_name': 'no_name_model',
+        'pretrained_model': '',
+        'freeze_decom_epochs': 0
     }
 
     parser = argparse.ArgumentParser(description="Parse config from YAML and command-line.")
@@ -178,6 +180,25 @@ def main(args):
     )
     
     model.to(device)
+    
+    # Load pretrained model if specified
+    if hasattr(args, 'pretrained_model') and args.pretrained_model and os.path.exists(args.pretrained_model):
+        print(f"Loading pretrained model from: {args.pretrained_model}")
+        checkpoint = torch.load(args.pretrained_model, map_location=device)
+        
+        # Handle different checkpoint formats
+        if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['model_state_dict'])
+            print(f"Loaded model from epoch {checkpoint.get('epoch', 'unknown')}")
+        else:
+            model.load_state_dict(checkpoint)
+        
+        print("Pretrained model loaded successfully!")
+        
+        # Optionally freeze DecomNet for initial epochs
+        if hasattr(args, 'freeze_decom_epochs') and args.freeze_decom_epochs > 0:
+            print(f"DecomNet will be frozen for the first {args.freeze_decom_epochs} epochs")
+            model.freeze_decom_epochs = args.freeze_decom_epochs
     
     # If channels is not given, try to infer from the first training image.
     train_files = sorted(glob(os.path.join(args.train_data, "*.*")))

@@ -203,6 +203,7 @@ class LowLightEnhance(nn.Module):
         self.relight_net = RelightNet(in_channels=input_channels)
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
+        self.freeze_decom_epochs = 0  # Number of epochs to freeze DecomNet
         
         if self.adaptive_lr:
             self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.lr_update_period, gamma=self.lr_update_factor)
@@ -266,6 +267,23 @@ class LowLightEnhance(nn.Module):
         mlflow.log_artifact(summary_path)
 
         for epoch in range(num_epochs):
+            # Handle DecomNet freezing/unfreezing
+            if hasattr(self, 'freeze_decom_epochs') and self.freeze_decom_epochs > 0:
+                if epoch < self.freeze_decom_epochs:
+                    # Freeze DecomNet parameters
+                    for param in self.decom_net.parameters():
+                        param.requires_grad = False
+                    print(f"Epoch {epoch+1}: DecomNet frozen")
+                elif epoch == self.freeze_decom_epochs:
+                    # Unfreeze DecomNet parameters
+                    for param in self.decom_net.parameters():
+                        param.requires_grad = True
+                    # Recreate optimizer to include all parameters
+                    self.optimizer = torch.optim.Adam(self.parameters(), lr=self.optimizer.param_groups[0]['lr'])
+                    if self.adaptive_lr:
+                        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.lr_update_period, gamma=self.lr_update_factor)
+                    print(f"Epoch {epoch+1}: DecomNet unfrozen")
+            
             cur_epoch_losses = {
                 'total_loss': 0,
                 'L_reconstruction': 0,

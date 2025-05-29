@@ -1,0 +1,38 @@
+use_gpu: 1
+seed_value: 41
+gpu_idx: "0"
+gpu_mem: 0.8
+decom: 0
+mat_key: "data"
+channels: 64
+global_min: 0.1167562
+global_max: 1.7410845
+normalization: "global_normalization"
+batch_size: 1
+patch_size: 128
+start_lr: 0.0001  # Lower learning rate for fine-tuning
+lr_update_factor: 1
+lr_update_period: 400
+train_data: "/media/medemirhan/A28C3B618C3B2EE3/Users/medemirhan/Desktop/n2n/PairLIE/data/hsi_dataset_outdoor_only/train"
+eval_data: "/media/medemirhan/A28C3B618C3B2EE3/Users/medemirhan/Desktop/n2n/PairLIE/data/hsi_dataset_outdoor_only/test"
+test_data: "/media/medemirhan/A28C3B618C3B2EE3/Users/medemirhan/Desktop/n2n/PairLIE/data/hsi_dataset_outdoor_only/test"
+label_dir: "/media/medemirhan/A28C3B618C3B2EE3/Users/medemirhan/Desktop/n2n/PairLIE/data/label_ll"
+phase: "train_and_test"
+epoch: 200  # Fewer epochs for fine-tuning
+eval_every_epoch: 50
+plot_every_epoch: 50
+# Start with indoor loss weights, then gradually adjust
+c_loss_reconstruction: 1
+c_loss_r_fidelity: 5000  # Start with value between indoor and outdoor
+c_loss_i_smooth_low: 500000  # Start with value between indoor and outdoor
+c_loss_i_smooth_delta: 50  # Start with value between indoor and outdoor
+c_loss_fourier: 0.05
+c_loss_spectral_cons: 100
+alpha_i_smooth_low: 1
+alpha_i_smooth_delta: 10
+save_reflectance: false
+save_illumination: false
+save_i_delta: false
+# Transfer learning settings
+pretrained_model: "checkpoint/no_name_model/Decom_20250524_182040/model_epoch_latest.pth"  # Path to indoor model
+freeze_decom_epochs: 0  # Number of epochs to freeze DecomNet (0 = no freezing)
