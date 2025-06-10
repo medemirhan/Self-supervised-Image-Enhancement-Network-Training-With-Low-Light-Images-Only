@@ -1,24 +1,31 @@
 clear all
+close all
 clc
 
 %% Settings
-imname         = '007_2_2021-01-20_024';
-imdir          = 'D:\results\comparison\ours\';
-algo           = 'ours';
-savepath       = 'C:\Users\medemirhan\Desktop\jstsp\figures\results';
-%showBand       = 20;
-waveStart_nm   = 417.73399;
-waveEnd_nm     = 976.35468;
+imname         = 'vegatables5';
+imdir          = 'D:\results\comparison\hcanet\indoor\v2';
+algo           = 'hcanet';
+savepath       = 'C:\Users\medemirhan\Desktop\tez\latex\figures\results';
+% waveStart_nm   = 407.73399;
+% waveEnd_nm     = 976.35468;
+waveStart_nm   = 453.81;
+waveEnd_nm     = 962.33;
 imname_postfix = '_falseColor';
-key            = 'ref';
+key            = 'data';
 
 %% Load and Prepare Image
 impath = fullfile(imdir, strcat(imname, '.mat'));
 dataStruct = load(impath);
 data = dataStruct.(key);
 
-% img  = data(:,:, showBand);
 img = visualizeHsiFalseColor(data, waveStart_nm, waveEnd_nm);
+% figure, imshow(img)
+
+% img = visualizeHsiFalseColor(data, waveStart_nm, waveEnd_nm, 'divideMax');
+% figure, imshow(img)
+
+% title(algo)
 
 % Get image dimensions
 % [h, w] = size(img);

@@ -50,7 +50,7 @@ def line_color_style_cycler():
     
     return custom_cycler
 
-def plot_vectors(wavelengths, metrics, figsize=None, font_family='serif', font_size=12, linewidth=2, axes_linewidth=1.2, save_path=''):   
+def plot_vectors(wavelengths, metrics, env, figsize=None, font_family='serif', font_size=12, linewidth=2, axes_linewidth=1.2, save_path=''):   
     # Set rcParams with full update
     plt.rcParams.update({
         'font.family': font_family,
@@ -73,9 +73,10 @@ def plot_vectors(wavelengths, metrics, figsize=None, font_family='serif', font_s
 
     plt.xlabel("Wavelength (nm)")
     plt.ylabel("MPSNR (dB)")
-    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
+    #plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
+    plt.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), ncol=1)
     plt.tight_layout()
-    plt.savefig(save_path + "/psnr_vector.eps", bbox_inches='tight')
+    plt.savefig(save_path + "/psnr_vector_" + env + ".png", bbox_inches='tight')
 
     # ------------------------------
     # Figure 2: SSIM Plot
@@ -89,103 +90,123 @@ def plot_vectors(wavelengths, metrics, figsize=None, font_family='serif', font_s
 
     plt.xlabel("Wavelength (nm)")
     plt.ylabel("MSSIM")
-    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
+    #plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
+    plt.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), ncol=1)
     plt.tight_layout()
-    plt.savefig(save_path + "/ssim_vector.eps", bbox_inches='tight')
+    plt.savefig(save_path + "/ssim_vector_" + env + ".png", bbox_inches='tight')
 
 if __name__ == '__main__':
-    globalMax=1.7410845
+    
+    env = 'indoor'
+    
+    if env == 'indoor':
+        globalMax=1.6697606
+        total_channels=224
+        d_head=20
+        d_tail=12
 
-    wavelengths, num_bands = select_hsi_wavelengths(
-        range_start=400,
-        range_end=1000,
-        total_channels=204,
-        d_head=6,
-        d_tail=6,
-        s=3
-        )
+    else:
+        globalMax=1.7410845
+        total_channels=204
+        d_head=6
+        d_tail=6
 
-    # Dictionary of algorithms with corresponding file paths for PSNR and SSIM calculations.
     label_path = '../PairLIE/data/label_ll'
-
+    
     algorithms = {
         'SS-HSLIE (Ours)': {
-            'preds_path': 'D:/results/comparison/ours',
+            'preds_path': 'D:/results/comparison/ours/' + env,
             'labels_path': label_path,
             'matKeyPred': 'ref',
             'matKeyGt': 'data'
         },
         'BM4D': {
-            'preds_path': 'D:/results/comparison/bm4d',
+            'preds_path': 'D:/results/comparison/bm4d/' + env,
             'labels_path': label_path,
             'matKeyPred': 'data',
             'matKeyGt': 'data'
         },
         'FastHyMix': {
-            'preds_path': 'D:/results/comparison/fast_hy_mix',
+            'preds_path': 'D:/results/comparison/fast_hy_mix/' + env,
             'labels_path': label_path,
             'matKeyPred': 'data',
             'matKeyGt': 'data'
         },
         'HCANet': {
-            'preds_path': 'D:/results/comparison/hcanet',
+            'preds_path': 'D:/results/comparison/hcanet/' + env,
             'labels_path': label_path,
             'matKeyPred': 'data',
             'matKeyGt': 'data'
         },
         'HE': {
-            'preds_path': 'D:/results/comparison/he',
+            'preds_path': 'D:/results/comparison/he/' + env,
             'labels_path': label_path,
             'matKeyPred': 'data',
             'matKeyGt': 'data'
         },
         'LRTDTV': {
-            'preds_path': 'D:/results/comparison/lrtdtv',
+            'preds_path': 'D:/results/comparison/lrtdtv/' + env,
             'labels_path': label_path,
             'matKeyPred': 'data',
             'matKeyGt': 'data'
         },
         'MR': {
-            'preds_path': 'D:/results/comparison/mr',
-            'labels_path': label_path,
-            'matKeyPred': 'data',
-            'matKeyGt': 'data'
-        },
-        'MSR': {
-            'preds_path': 'D:/results/comparison/msr',
+            'preds_path': 'D:/results/comparison/mr/' + env,
             'labels_path': label_path,
             'matKeyPred': 'data',
             'matKeyGt': 'data'
         },
         'CLAHE': {
-            'preds_path': 'D:/results/comparison/clahe',
+            'preds_path': 'D:/results/comparison/clahe/' + env,
             'labels_path': label_path,
             'matKeyPred': 'data',
-            'matKeyGt': 'data'
-        },
-        'DeepHS Pr.': {
-            'preds_path': 'D:/results/comparison/deep_hs_prior',
-            'labels_path': label_path,
-            'matKeyPred': 'pred',
             'matKeyGt': 'data'
         },
         'RetinexNet': {
-            'preds_path': 'D:/results/comparison/retinexnet',
+            'preds_path': 'D:/results/comparison/retinexnet/' + env,
             'labels_path': label_path,
             'matKeyPred': 'data',
             'matKeyGt': 'data'
         },
+        'RCILD': {
+            'preds_path': 'D:/results/comparison/rcild/' + env,
+            'labels_path': label_path,
+            'matKeyPred': 'data',
+            'matKeyGt': 'data'
+        }
     }
-    
+
+    if env == 'outdoor':
+        algorithms['HCANet']['preds_path'] += '/v2'
+        algorithms['RCILD']['preds_path'] += '/testOutdoorWithIndoorModel'
+        algorithms['RetinexNet']['preds_path'] += '/testOutdoorWithIndoorModel'
+    else:
+        algorithms['DHS Pr'] = {
+            'preds_path': 'D:/results/comparison/deep_hs_prior/' + env,
+            'labels_path': label_path,
+            'matKeyPred': 'pred',
+            'matKeyGt': 'data'
+        }
+
+    wavelengths, num_bands = select_hsi_wavelengths(
+        range_start=400,
+        range_end=1000,
+        total_channels=total_channels,
+        d_head=d_head,
+        d_tail=d_tail,
+        s=3
+        )
+
     metrics = get_metrics(algorithms=algorithms, data_min=None, data_max=globalMax)
     
     plot_vectors(
         wavelengths=wavelengths,
         metrics=metrics,
-        figsize=(14, 9),
+        env=env,
+        figsize=(16, 9),
         font_family='serif',
-        font_size=15,
-        linewidth=3,
+        font_size=19,
+        linewidth=3.5,
         axes_linewidth=1.2,
-        save_path='C:/Users/medemirhan/Desktop/mdpi/figures/results'
+        save_path='C:/Users/medemirhan/Desktop/jstsp/figures/results'
         )

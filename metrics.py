@@ -120,8 +120,7 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
         im2 = load_hsi(os.path.join(label_dir, name), matContentHeader=matKeyGt)
         im2 = torch.from_numpy(im2).to(dtype=torch.float32)
 
-        if im1.shape[0] < im2.shape[0]:
-            im2 = im2[:im1.shape[0], :, :]
+        # im1 = np.clip(im1, 0.0708354, 1.7410845)
 
         data_range = None
         if data_min != None and data_max != None:
@@ -152,12 +151,8 @@ if __name__ == '__main__':
 
     globalMin = 0.1167562
     globalMax = 1.7410845
-    lowLightMin = 0.0708354
-    lowLightMax = 0.2173913
-    normalLightMin = 0.0708354
-    normalLightMax = 1.7410845
 
-    im_dir = 'D:/results/comparison/retinexnet/outdoor/*.mat'
+    im_dir = 'D:/results/comparison/rcild/outdoor/testOutdoorWithIndoorModel/*.mat'
     label_dir = '../PairLIE/data/label_ll'
 
     avg_psnr, avg_ssim, avg_sam = calc_metrics(

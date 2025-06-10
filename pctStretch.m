@@ -15,7 +15,7 @@ function out = pctStretch(in, pLow, pHigh, doScale)
 %     out     – clipped (and optionally scaled) image
 
     if nargin < 4
-        doScale = true;
+        doScale = 1;
     end
 
     lo = prctile(in(:), pLow);

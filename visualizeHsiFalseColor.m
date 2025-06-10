@@ -1,10 +1,6 @@
-function falseColorImage = visualizeHsiFalseColor(HSI, waveStart_nm, waveEnd_nm, imname, normalize)
-    if nargin < 5
-        normalize = false;
-    end
-    
+function falseColorImage = visualizeHsiFalseColor(HSI, waveStart_nm, waveEnd_nm, normalize)
     if nargin < 4
-        imname = '';
+        normalize = 'none';
     end
     
     [~,~,bands] = size(HSI);
@@ -19,19 +15,29 @@ function falseColorImage = visualizeHsiFalseColor(HSI, waveStart_nm, waveEnd_nm,
     R = HSI(:, :, idxNIR);
     G = HSI(:, :, idxRed);
     B = HSI(:, :, idxGreen);
-
-    if normalize
+    
+    maxx = max([max(R(:)), max(G(:)), max(B(:))]);
+    
+    if strcmp(normalize, 'zeroOne')
         % Normalize each band between 0 and 1
         R = mat2gray(R);
         G = mat2gray(G);
         B = mat2gray(B);
-%         R = R/max(R(:));
-%         G = G/max(G(:));
-%         B = B/max(B(:));
-%        %--- percentile contrast stretch --------------------------------------
-%        R = pctStretch(R,5,95,'true');
-%        G = pctStretch(G,5,95,'true');
-%        B = pctStretch(B,5,95,'true');
+    elseif strcmp(normalize, 'divideMax')
+        R = R/max(R(:));
+        G = G/max(G(:));
+        B = B/max(B(:));
+    elseif strcmp(normalize, 'divideGMax')
+        R = R/maxx;
+        G = G/maxx;
+        B = B/maxx;
+    elseif strcmp(normalize, 'percClip')
+        R = pctStretch(R,3,97,0);
+        G = pctStretch(G,3,97,0);
+        B = pctStretch(B,3,97,0);
+        R = R/max(R(:));
+        G = G/max(G(:));
+        B = B/max(B(:));
     end
 
     % Combine into RGB image
@@ -41,7 +47,7 @@ function falseColorImage = visualizeHsiFalseColor(HSI, waveStart_nm, waveEnd_nm,
     if nargout == 0
         figure;
         imshow(falseColorImage);
-        title(['False Color Composite (NIR-R-G) - ', imname]);
+        title('False Color Composite (NIR-R-G) - ');
         clear falseColorImage; % Make sure no unwanted output happens
     end
 end

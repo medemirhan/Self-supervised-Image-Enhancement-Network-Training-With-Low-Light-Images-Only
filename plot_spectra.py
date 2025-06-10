@@ -81,31 +81,57 @@ if __name__ == '__main__':
 
     # Paths, keys, titles
     # Build a list of dictionaries similar to the dataToCompare array in MATLAB.
-    save_path='C:/Users/medemirhan/Desktop/mdpi/figures/results'
-    data_to_compare = [
-        {"path": r"D:\results\comparison\normal\buildingblock.mat", "key": "data", "label": "Ground Truth"},
-        {"path": r"D:\results\comparison\ours\buildingblock.mat",   "key": "ref",  "label": "SS-HSLIE (Ours)"},
-        {"path": r"D:\results\comparison\low\buildingblock.mat",    "key": "data", "label": "Low-light"},
-        {"path": r"D:\results\comparison\bm4d\buildingblock.mat",    "key": "data", "label": "BM4D"},
-        {"path": r"D:\results\comparison\clahe\buildingblock.mat",   "key": "data", "label": "CLAHE"},
-        {"path": r"D:\results\comparison\deep_hs_prior\buildingblock.mat", "key": "pred", "label": "DeepHS Pr."},
-        {"path": r"D:\results\comparison\fast_hy_mix\buildingblock.mat", "key": "data", "label": "FastHyMix"},
-        {"path": r"D:\results\comparison\hcanet\buildingblock.mat",       "key": "data", "label": "HCANet"},
-        {"path": r"D:\results\comparison\he\buildingblock.mat",           "key": "data", "label": "HE"},
-        {"path": r"D:\results\comparison\lrtdtv\buildingblock.mat",        "key": "data", "label": "LRTDTV"},
-        {"path": r"D:\results\comparison\mr\buildingblock.mat",            "key": "data", "label": "MR"},
-        {"path": r"D:\results\comparison\msr\buildingblock.mat",           "key": "data", "label": "MSR"},
-        {"path": r"D:\results\comparison\retinexnet\buildingblock.mat",     "key": "data", "label": "RetinexNet"}
-    ]
+    save_path='C:/Users/medemirhan/Desktop/tez/latex/figures/results'
+
+    indoor = 1
+    if indoor:
+        mat_name = 'vegatables5'
+        data_to_compare = [
+            {"path": rf"D:\results\comparison\normal\indoor\{mat_name}.mat", "key": "data", "label": "Ground Truth"},
+            {"path": rf"D:\results\comparison\ours\indoor\{mat_name}.mat",   "key": "ref",  "label": "SS-HSLIE (Ours)"},
+            {"path": rf"D:\results\comparison\low\indoor\{mat_name}.mat",    "key": "data", "label": "Low-light"},
+            {"path": rf"D:\results\comparison\bm4d\indoor\{mat_name}.mat",    "key": "data", "label": "BM4D"},
+            {"path": rf"D:\results\comparison\clahe\indoor\{mat_name}.mat",   "key": "data", "label": "CLAHE"},
+            {"path": rf"D:\results\comparison\deep_hs_prior\indoor\{mat_name}.mat", "key": "pred", "label": "DeepHS Pr."},
+            {"path": rf"D:\results\comparison\fast_hy_mix\indoor\{mat_name}.mat", "key": "data", "label": "FastHyMix"},
+            {"path": rf"D:\results\comparison\hcanet\indoor\{mat_name}.mat",       "key": "data", "label": "HCANet"},
+            {"path": rf"D:\results\comparison\he\indoor\{mat_name}.mat",           "key": "data", "label": "HE"},
+            {"path": rf"D:\results\comparison\lrtdtv\indoor\{mat_name}.mat",        "key": "data", "label": "LRTDTV"},
+            {"path": rf"D:\results\comparison\mr\indoor\{mat_name}.mat",            "key": "data", "label": "MR"},
+            #{"path": rf"D:\results\comparison\rctv\indoor\{mat_name}.mat",           "key": "output", "label": "RCTV"},
+            {"path": rf"D:\results\comparison\rcild\indoor\{mat_name}.mat",           "key": "data", "label": "RCILD"},
+            {"path": rf"D:\results\comparison\retinexnet\indoor\{mat_name}.mat",     "key": "data", "label": "RetinexNet"}
+        ]
+        x_locs = [131, 134, 253, 327]
+        y_locs = [57, 214, 146, 158]
+        waveStart_nm = 453.8117
+        waveEnd_nm = 962.3318
+    else:
+        mat_name = '007_2_2021-01-20_024'
+        data_to_compare = [
+            {"path": rf"D:\results\comparison\normal\outdoor\{mat_name}.mat", "key": "data", "label": "Ground Truth"},
+            {"path": rf"D:\results\comparison\ours\outdoor\{mat_name}.mat",   "key": "ref",  "label": "SS-HSLIE (Ours)"},
+            {"path": rf"D:\results\comparison\low\outdoor\{mat_name}.mat",    "key": "data", "label": "Low-light"},
+            {"path": rf"D:\results\comparison\bm4d\outdoor\{mat_name}.mat",    "key": "data", "label": "BM___"},
+            {"path": rf"D:\results\comparison\clahe\outdoor\{mat_name}.mat",   "key": "data", "label": "CLAHE"},
+            #{"path": rf"D:\results\comparison\deep_hs_prior\outdoor\{mat_name}.mat", "key": "pred", "label": "DHS___"},
+            {"path": rf"D:\results\comparison\fast_hy_mix\outdoor\{mat_name}.mat", "key": "data", "label": "FastHyMix"},
+            {"path": rf"D:\results\comparison\hcanet\outdoor\v2\{mat_name}.mat",       "key": "data", "label": "HCANet"},
+            {"path": rf"D:\results\comparison\he\outdoor\{mat_name}.mat",           "key": "data", "label": "HE"},
+            {"path": rf"D:\results\comparison\lrtdtv\outdoor\{mat_name}.mat",        "key": "data", "label": "LRTDTV"},
+            {"path": rf"D:\results\comparison\mr\outdoor\{mat_name}.mat",            "key": "data", "label": "MR"},
+            #{"path": rf"D:\results\comparison\rctv\outdoor\{mat_name}.mat",           "key": "output", "label": "RCTV"},
+            {"path": rf"D:\results\comparison\rcild\outdoor\testOutdoorWithIndoorModel\{mat_name}.mat",           "key": "data", "label": "RCILD"},
+            {"path": rf"D:\results\comparison\retinexnet\outdoor\testOutdoorWithIndoorModel\{mat_name}.mat",     "key": "data", "label": "RetinexNet"}
+        ]
+        x_locs = [75, 160, 250, 425]
+        y_locs = [175, 340, 325, 420]
+        waveStart_nm = 407.73399
+        waveEnd_nm = 976.35468
 
     # Parameters
     # These locations and parameters come directly from the MATLAB code.
-    x_locs = [250, 110, 200, 370]
-    y_locs = [310, 190, 240, 200]
     window_size = 5  # must be an odd number
-    sample_band = 20  # MATLAB index (1-indexed); will subtract one for Python (0-indexed)
-    waveStart_nm = 453.8117
-    waveEnd_nm = 962.3318
 
     # Load data
     # Load the first hyperspectral image to get its dimensions.
@@ -171,11 +197,11 @@ if __name__ == '__main__':
                 letter = letters[j]
                 # Offset the text (adjust as necessary)
                 plt.text(
-                    x + 5,
-                    y - 5,
-                    f'({letter}) [{x+1}, {y+1}]',
+                    x + 15,
+                    y - 15,
+                    f'({letter})',
                     color='blue',
-                    fontsize=10,
+                    fontsize=20,
                     weight='bold',
                     bbox=dict(
                         facecolor='white',      # box background color
@@ -191,14 +217,14 @@ if __name__ == '__main__':
         
         # Save the figure; here we save each figure separately.
         # For example, name files "hs_image_0.png", "hs_image_1.png", etc.
-        filename = f"hs_image_{i}.eps"
+        filename = "hs_image_" + mat_name + "_" + str(indoor) + ".eps"
         plt.tight_layout()
         plt.savefig(os.path.join(save_path, filename), dpi=300, bbox_inches='tight')
         plt.close()
 
     plt.rcParams.update({
         'font.family': 'serif',
-        'font.size': 13,
+        'font.size': 19,
         'axes.linewidth': 1.2,
         'xtick.direction': 'in',
         'ytick.direction': 'in',
@@ -210,6 +236,7 @@ if __name__ == '__main__':
     # Create one figure per (x,y) location.
     # Note: Convert MATLAB 1-indexing to Python 0-indexing.
     for idx in range(len(x_locs)):
+        letter = letters[idx]
         # Convert coordinates to zero-indexed values.
         x_loc = x_locs[idx] - 1
         y_loc = y_locs[idx] - 1
@@ -223,7 +250,7 @@ if __name__ == '__main__':
         y_end = min(h, y_start + window_size)
         
         # Create a new figure for this spectrum.
-        plt.figure(figsize=(14, 9))
+        plt.figure(figsize=(16, 9))
         
         # Prepare a list to collect labels for the legend.
         legend_labels = []
@@ -238,22 +265,22 @@ if __name__ == '__main__':
             # Sum over the first two axes then divide by (window_size**2)
             spectrum = np.sum(window, axis=(0, 1)) / (window_size ** 2)
             if data_to_compare[j]["label"]=="SS-HSLIE (Ours)":
-                plt.plot(spectrum, linewidth=3, color='r', linestyle='-')
+                plt.plot(spectrum, linewidth=3.5, color='r', linestyle='-')
             elif data_to_compare[j]["label"]=="Ground Truth":
-                plt.plot(spectrum, linewidth=3, color='b', linestyle='-')
+                plt.plot(spectrum, linewidth=3.5, color='b', linestyle='-')
             elif data_to_compare[j]["label"]=="Low-light":
-                plt.plot(spectrum, linewidth=3, color='g', linestyle='--')
+                plt.plot(spectrum, linewidth=3.5, color='g', linestyle='--')
             else:
-                plt.plot(spectrum, linewidth=2)
+                plt.plot(spectrum, linewidth=2.5)
             legend_labels.append(data_to_compare[j]["label"])
         
         plt.xlabel('Band Number')
         plt.ylabel('Reflectance')
-        plt.legend(legend_labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(data_to_compare)/2))
+        #plt.legend(legend_labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(data_to_compare)/2))
+        plt.legend(legend_labels, loc='upper left', bbox_to_anchor=(1.01, 1.0), ncol=1)
         plt.tight_layout()
         # Save the spectrum plot as a separate file.
-        spectrum_filename = f"spectrum_at_{x_locs[idx]}-{y_locs[idx]}.eps"
+        spectrum_filename = f"spectrum_at_{letter}_{str(indoor)}_{mat_name}.eps"
         plt.tight_layout()
         plt.savefig(os.path.join(save_path, spectrum_filename), bbox_inches='tight')
-        #plt.savefig(spectrum_filename, dpi=300)
         plt.close()
