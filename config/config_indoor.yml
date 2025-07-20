@@ -13,9 +13,9 @@ patch_size: 128
 start_lr: 0.001
 lr_update_factor: 1
 lr_update_period: 400
-train_data: "../PairLIE/data/hsi_dataset_indoor_only/train"
+train_data: "../PairLIE/data/hsi_dataset_indoor_only/crossVal/train1"
 eval_data: "../PairLIE/data/hsi_dataset_indoor_only/eval"
-test_data: "../PairLIE/data/hsi_dataset_indoor_only/test"
+test_data: "../PairLIE/data/hsi_dataset_indoor_only/crossVal/test1"
 label_dir: "../PairLIE/data/label_ll"
 phase: "train_and_test"
 epoch: 400
