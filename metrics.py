@@ -113,33 +113,36 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
     avg_sam = 0
     n = 0
     for item in sorted(glob.glob(im_dir)):
-        n += 1
-        im1 = load_hsi(item, matContentHeader=matKeyPrediction)
-        im1 = torch.from_numpy(im1).to(dtype=torch.float32)
-        name = item.split('\\')[-1]
-        im2 = load_hsi(os.path.join(label_dir, name), matContentHeader=matKeyGt)
-        im2 = torch.from_numpy(im2).to(dtype=torch.float32)
+        if item.endswith(".mat"):
+            n += 1
+            im1 = load_hsi(item, matContentHeader=matKeyPrediction)
+            im1 = torch.from_numpy(im1).to(dtype=torch.float32)
+            name = item.split('\\')[-1]
+            im2 = load_hsi(os.path.join(label_dir, name), matContentHeader=matKeyGt)
+            im2 = torch.from_numpy(im2).to(dtype=torch.float32)
 
-        # im1 = np.clip(im1, 0.0708354, 1.7410845)
+            # im1 = np.clip(im1, 0.0708354, 1.7410845)
 
-        data_range = None
-        if data_min != None and data_max != None:
-            data_range = (data_min, data_max)
-            print("====> WARNING: Data will be clamped between data range values <====".format(avg_psnr))
-        elif data_max != None:
-            data_range = data_max
+            # im1 = im1 * (694.599672 - 0.004533) + 0.004533
 
-        score_psnr = psnr(im1, im2, data_range=data_range) # data range onemli. incele!
-        score_ssim = ssim(im1, im2, data_range=data_range) # data range onemli. incele!
-        score_sam = sam(im1, im2, reduction='elementwise_mean') # reduction onemli. incele!
-    
-        print(f'\n===> {name} | PSNR : {score_psnr:.4f}')
-        print(f'===> {name} | SSIM : {score_ssim:.4f}')
-        print(f'===> {name} | SAM  : {score_sam:.4f}')
+            data_range = None
+            if data_min != None and data_max != None:
+                data_range = (data_min, data_max)
+                print("====> WARNING: Data will be clamped between data range values <====".format(avg_psnr))
+            elif data_max != None:
+                data_range = data_max
 
-        avg_psnr += score_psnr
-        avg_ssim += score_ssim
-        avg_sam += score_sam
+            score_psnr = psnr(im1, im2, data_range=data_range) # data range onemli. incele!
+            score_ssim = ssim(im1, im2, data_range=data_range) # data range onemli. incele!
+            score_sam = sam(im1, im2, reduction='elementwise_mean') # reduction onemli. incele!
+        
+            print(f'\n===> {name} | PSNR : {score_psnr:.4f}')
+            print(f'===> {name} | SSIM : {score_ssim:.4f}')
+            print(f'===> {name} | SAM  : {score_sam:.4f}')
+
+            avg_psnr += score_psnr
+            avg_ssim += score_ssim
+            avg_sam += score_sam
 
     avg_psnr = avg_psnr / n
     avg_ssim = avg_ssim / n

@@ -11,6 +11,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('Agg')
 from sklearn.decomposition import PCA
+import metrics
 
 from utils import pca_projection, save_hsi, data_augmentation, load_hsi
 
@@ -178,7 +179,8 @@ class LowLightEnhance(nn.Module):
     def __init__(self, input_channels=64, lr=1e-3, lr_update_factor=1, lr_update_period=None, time_stamp=None, 
                  c_loss_reconstruction=10, c_loss_r_fidelity=1, c_loss_i_smooth_low=1, c_loss_i_smooth_delta=20,
                  c_loss_fourier=0.2, c_loss_spectral_cons=1, alpha_i_smooth_low=1, alpha_i_smooth_delta=10,
-                 device=torch.device("cpu")):
+                 device=torch.device("cpu"), global_min=None, global_max=None,
+                 save_reflectance=False, save_illumination=False, save_i_delta=False):
         super(LowLightEnhance, self).__init__()
         self.input_channels = input_channels
         self.device = device
@@ -195,6 +197,13 @@ class LowLightEnhance(nn.Module):
         self.lr_update_factor = lr_update_factor
         self.lr_update_period = lr_update_period
         self.adaptive_lr = False
+        self.global_min = global_min
+        self.global_max = global_max
+        self.save_reflectance=save_reflectance,
+        self.save_illumination=save_illumination,
+        self.save_i_delta=save_i_delta
+
+        self.eval_metrics = {}
 
         if abs(self.lr_update_factor - 1) > 1e-6:
             self.adaptive_lr = True
@@ -225,7 +234,7 @@ class LowLightEnhance(nn.Module):
         S = R_low * I_delta + R_low * I_low
         return R_low, I_low, I_delta, S
     
-    def train_model(self, train_data_path, eval_data_path, batch_size, patch_size, num_epochs, start_lr, ckpt_dir, eval_result_dir, eval_every_epoch, max_val=None, min_val=None, plot_every_epoch=10):
+    def train_model(self, train_data_path, eval_data_path, batch_size, patch_size, num_epochs, start_lr, ckpt_dir, eval_result_dir, eval_every_epoch, label_dir, plot_every_epoch=10):
         ckpt_dir = os.path.join(ckpt_dir, 'Decom_' + self.time_stamp)
         
         os.makedirs(ckpt_dir, exist_ok=True)
@@ -234,9 +243,9 @@ class LowLightEnhance(nn.Module):
         train_low_data = []
         train_high_data = []
         for file in train_files:
-            low_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=max_val, min_val=min_val)
+            low_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=self.global_max, min_val=self.global_min)
             train_low_data.append(low_im)
-            high_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=max_val, min_val=min_val)
+            high_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=self.global_max, min_val=self.global_min)
             train_high_data.append(high_im)
             low_eq = pca_projection(low_im)
             if low_eq.ndim == 2:
@@ -244,7 +253,7 @@ class LowLightEnhance(nn.Module):
         eval_low_data = []
         eval_files = sorted(glob(os.path.join(eval_data_path, "*.*")))
         for file in eval_files:
-            eval_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=1.7410845, min_val=0.0708354)
+            eval_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=self.global_max, min_val=self.global_min)
             eval_low_data.append(eval_im)
         
         num_batches = len(train_low_data) // batch_size
@@ -327,6 +336,7 @@ class LowLightEnhance(nn.Module):
                 self.plot_loss_curve(os.path.join(eval_result_dir, 'loss_curves_combined.png'))
             
             if (epoch + 1) % eval_every_epoch == 0:
+                self.evaluate_model(eval_low_data, eval_files, eval_result_dir, epoch+1, label_dir)
                 self.save_checkpoint(os.path.join(ckpt_dir, f"model_epoch_{epoch+1}.pth"), epoch+1)
                 self.save_checkpoint(os.path.join(ckpt_dir, "model_epoch_latest.pth"), epoch+1)
 
@@ -340,6 +350,65 @@ class LowLightEnhance(nn.Module):
         
         mlflow.log_param('model_path', os.path.normpath(os.path.join(ckpt_dir, "model_epoch_latest.pth")))
     
+    def evaluate_model(self, eval_low_data, eval_files, eval_result_dir, epoch, label_dir):
+        """
+        Evaluates the model on the evaluation dataset and saves the output images.
+        """
+        print(f"--- Running evaluation for epoch {epoch} ---")
+        self.eval()  # Set the model to evaluation mode
+
+        # Create a subdirectory for this epoch's evaluation results to keep them organized
+        epoch_eval_dir = os.path.join(eval_result_dir, f'epoch_{epoch}')
+        os.makedirs(epoch_eval_dir, exist_ok=True)
+
+        with torch.no_grad():
+            for idx, low_im in enumerate(eval_low_data):
+                filename = os.path.basename(eval_files[idx])
+                
+                input_tensor = torch.from_numpy(low_im).unsqueeze(0).permute(0, 3, 1, 2).to(self.device)
+                
+                # Forward pass to get the enhanced image S
+                R_low, I_low, I_delta, S = self.forward(input_tensor)
+                
+                # Convert tensor to numpy array for saving
+                S_np = S.squeeze(0).permute(1, 2, 0).cpu().numpy()
+
+				#################################2
+                
+                # Save the resulting image
+                save_hsi(os.path.join(epoch_eval_dir, filename), S_np)
+
+                artifact_dir = os.path.join(epoch_eval_dir, 'artifacts')
+                os.makedirs(artifact_dir, exist_ok=True)
+
+                if self.save_reflectance:
+                    R_np = R_low.squeeze(0).permute(1, 2, 0).cpu().numpy()
+                    save_hsi(os.path.join(artifact_dir, filename.split('.')[0] + '_R_low.mat'), R_np)
+                if self.save_illumination:
+                    I_np = I_low.squeeze(0).permute(1, 2, 0).cpu().numpy()
+                    save_hsi(os.path.join(artifact_dir, filename.split('.')[0] + '_I_low.mat'), I_np)
+                if self.save_i_delta:
+                    I_delta_np = I_delta.squeeze(0).permute(1, 2, 0).cpu().numpy()
+                    save_hsi(os.path.join(artifact_dir, filename.split('.')[0] + '_I_delta.mat'), I_delta_np)
+        
+        im_dir = epoch_eval_dir + '/*.mat'
+
+        avg_psnr, avg_ssim, avg_sam = metrics.calc_metrics(
+            im_dir=os.path.normpath(epoch_eval_dir + '/*.mat'),
+            label_dir=os.path.normpath(label_dir),
+            data_min=None,
+            data_max=self.global_max,
+            matKeyPrediction='ref',
+            matKeyGt='data'
+            )
+        
+        self.eval_metrics[epoch] = {"psnr": avg_psnr, "ssim": avg_ssim, "sam": avg_sam}
+
+        self.plot_eval_metrics(os.path.join(eval_result_dir, 'eval_metrics.png'))
+
+        print(f"--- Evaluation for epoch {epoch} finished. Results saved to {epoch_eval_dir} ---")
+        self.train() # IMPORTANT: Set the model back to training mode
+
     def test_model(self, model_dir, test_low_data, test_low_data_names, save_dir, save_reflectance=False, save_illumination=False, save_i_delta=False):
         self.load_checkpoint(os.path.join(model_dir, 'model_epoch_latest.pth'))
         self.eval()
@@ -357,17 +426,21 @@ class LowLightEnhance(nn.Module):
                 total_run_time += run_time
                 S_np = S.squeeze(0).permute(1, 2, 0).cpu().numpy()
 
+				#################################1
                 save_hsi(os.path.join(save_dir, filename), S_np)
+
+                artifact_dir = os.path.join(save_dir, 'artifacts')
+                os.makedirs(artifact_dir, exist_ok=True)
 
                 if save_reflectance:
                     R_np = R_low.squeeze(0).permute(1, 2, 0).cpu().numpy()
-                    save_hsi(os.path.join(save_dir, filename.split('.')[0] + '_R_low.mat'), R_np)
+                    save_hsi(os.path.join(artifact_dir, filename.split('.')[0] + '_R_low.mat'), R_np)
                 if save_illumination:
                     I_np = I_low.squeeze(0).permute(1, 2, 0).cpu().numpy()
-                    save_hsi(os.path.join(save_dir, filename.split('.')[0] + '_I_low.mat'), I_np)
+                    save_hsi(os.path.join(artifact_dir, filename.split('.')[0] + '_I_low.mat'), I_np)
                 if save_i_delta:
                     I_delta_np = I_delta.squeeze(0).permute(1, 2, 0).cpu().numpy()
-                    save_hsi(os.path.join(save_dir, filename.split('.')[0] + '_I_delta.mat'), I_delta_np)
+                    save_hsi(os.path.join(artifact_dir, filename.split('.')[0] + '_I_delta.mat'), I_delta_np)
 
                 print(f"Processed {filename} in {run_time:.4f} seconds.")
             avg_run_time = total_run_time / len(test_low_data) if len(test_low_data) > 0 else 0
@@ -548,6 +621,47 @@ class LowLightEnhance(nn.Module):
         self.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         print(f"Loaded checkpoint from {path}")
+    
+    def plot_eval_metrics(self, save_path):
+        epochs = sorted(self.eval_metrics.keys())
+        psnrs = [self.eval_metrics[e]["psnr"] for e in epochs]
+        ssims = [self.eval_metrics[e]["ssim"] for e in epochs]
+        sams  = [self.eval_metrics[e]["sam"]  for e in epochs]
+
+        plt.figure(figsize=(10, 10))
+
+        plt.subplot(3, 1, 1)
+        plt.plot(epochs, psnrs, 'k-', label='avg_psnr')
+        plt.title('Eval PSNR')
+        plt.xlabel('Epoch')
+        plt.ylabel('PSNR')
+        plt.grid(True)
+        plt.legend()
+
+        plt.subplot(3, 1, 2)
+        plt.plot(epochs, ssims, 'r-', label='avg_ssim')
+        plt.title('Eval SSIM')
+        plt.xlabel('Epoch')
+        plt.ylabel('SSIM')
+        plt.grid(True)
+        plt.legend()
+
+        plt.subplot(3, 1, 3)
+        plt.plot(epochs, sams, 'b-', label='avg_sam')
+        plt.title('Eval SAM')
+        plt.xlabel('Epoch')
+        plt.ylabel('SAM')
+        plt.grid(True)
+        plt.legend()
+
+        plt.tight_layout()
+        
+        # Create directory if it doesn't exist
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        
+        plt.savefig(save_path)
+        plt.close()
+        print(f"Eval metrics saved to {save_path}")
 
     def plot_loss_curve(self, save_path):
         """Plot and save all training loss curves with epoch numbers"""

@@ -3,14 +3,14 @@ close all
 clc
 
 %% Settings
-imname         = 'vegatables5';
-imdir          = 'D:\results\comparison\hcanet\indoor\v2';
-algo           = 'hcanet';
+imname         = 'buildingblock';
+imdir          = 'D:\results\comparison\exposure_diffusion\indoor';
+algo           = 'exposure_diffusion';
 savepath       = 'C:\Users\medemirhan\Desktop\tez\latex\figures\results';
 % waveStart_nm   = 407.73399;
 % waveEnd_nm     = 976.35468;
-waveStart_nm   = 453.81;
-waveEnd_nm     = 962.33;
+waveStart_nm   = 397.32;
+waveEnd_nm     = 1003.58;
 imname_postfix = '_falseColor';
 key            = 'data';
 
@@ -24,6 +24,10 @@ img = visualizeHsiFalseColor(data, waveStart_nm, waveEnd_nm);
 
 % img = visualizeHsiFalseColor(data, waveStart_nm, waveEnd_nm, 'divideMax');
 % figure, imshow(img)
+
+% img = visualizeHsiFalseColor(data, waveStart_nm, waveEnd_nm, 1157, 238, 'globalNorm');
+
+% img = visualizeHsiFalseColor(data, waveStart_nm, waveEnd_nm, 'divideGlobalMax', 1157);
 
 % title(algo)
 

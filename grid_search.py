@@ -5,42 +5,69 @@ import os
 
 # Define parameter grid
 param_grid = {
-    'c_loss_reconstruction': [1, 0.1, 50],
-    'c_loss_r_fidelity': [10000, 1, 500],
-    'c_loss_i_smooth_low': [1000000, 1, 1000],
-    'c_loss_i_smooth_delta': [100, 5, 10000],
-    'c_loss_fourier': [0.05, 0.20, 10],
-    'c_loss_spectral_cons': [100, 1, 50],
+    'c_loss_reconstruction': [10,1000],
+    'c_loss_r_fidelity': [1,100],
+    'c_loss_i_smooth_low': [0.1,1,100],
+    'c_loss_i_smooth_delta': [1,20,2000],
+    'c_loss_fourier': [0.2,20],
+    'c_loss_spectral_cons': [1,100],
     'alpha_i_smooth_low': [1, 0.1, 20],
     'alpha_i_smooth_delta': [10, 1, 0.1],
 }
 
 # Path to the base config file
-base_config_path = './config/config_outdoor_grid.yml'
+base_config_path = './config/config_jyu_outdoor_simple_64.yml'
 with open(base_config_path, 'r') as f:
     base_config = yaml.safe_load(f)
 
 # Create output directory for generated configs
-os.makedirs('configs', exist_ok=True)
+output_config_dir = 'configs'
+os.makedirs(output_config_dir, exist_ok=True)
 
 # Generate all combinations
 keys, values = zip(*param_grid.items())
-for idx, combo in enumerate(itertools.product(*values)):
+combinations = list(itertools.product(*values))
+total_combinations = len(combinations)
+
+print(f"Starting grid search with {total_combinations} combinations...")
+
+# --- Loop through all combinations ---
+for idx, combo in enumerate(combinations):
     config = base_config.copy()
     combo_dict = dict(zip(keys, combo))
     config.update(combo_dict)
     
     # Write new config file
-    config_path = f'configs/config_{idx}.yaml'
+    config_path = os.path.join(output_config_dir, f'config_{idx}.yaml')
     with open(config_path, 'w') as f:
         yaml.dump(config, f)
     
-    print(f"\nRunning config {idx}: {combo_dict}")
+    print("-" * 50)
+    print(f"Running combination {idx + 1}/{total_combinations}: {combo_dict}")
+
     try:
-        subprocess.run([
+        # The command to run the training script
+        command = [
             'python', 'main.py',
             '--config', config_path,
-            '--model_name', 'outdoor_grid_search2'
-        ], check=True)
+            '--model_name', 'jyu_outdoor_simple_64_grid_search'
+        ]
+        # Run the subprocess. If it fails, CalledProcessError will be raised.
+        subprocess.run(command, check=True, capture_output=True, text=True)
+        print(f"Combination {idx + 1} completed successfully.")
+
+    except subprocess.CalledProcessError as e:
+        # This block catches the error, allowing the loop to continue.
+        print(f"!!! Combination {idx + 1} FAILED !!!")
+        print(f"Return Code: {e.returncode}")
+        print("\n--- STDOUT ---")
+        print(e.stdout)
+        print("\n--- STDERR ---")
+        print(e.stderr)
+        print("-" * 50)
+        # The script will now continue to the next iteration.
+
     finally:
-        os.remove(config_path)
+        # This block always runs, ensuring the temporary config file is removed.
+        if os.path.exists(config_path):
+            os.remove(config_path)

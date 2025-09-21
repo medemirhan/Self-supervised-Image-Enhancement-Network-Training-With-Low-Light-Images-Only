@@ -98,8 +98,7 @@ def train(model, args):
         ckpt_dir=args.model_ckpt_dir,
         eval_result_dir=args.eval_result_dir,
         eval_every_epoch=args.eval_every_epoch,
-        max_val=args.global_max,
-        min_val=args.global_min, 
+        label_dir=args.label_dir,
         plot_every_epoch=args.plot_every_epoch
         )
 
@@ -176,7 +175,12 @@ def main(args):
         c_loss_spectral_cons=args.c_loss_spectral_cons,
         alpha_i_smooth_low=args.alpha_i_smooth_low,
         alpha_i_smooth_delta=args.alpha_i_smooth_delta,
-        device=device
+        device=device,
+        global_min=args.global_min,
+        global_max=args.global_max,
+        save_reflectance=args.save_reflectance,
+        save_illumination=args.save_illumination,
+        save_i_delta=args.save_i_delta
     )
     
     model.to(device)

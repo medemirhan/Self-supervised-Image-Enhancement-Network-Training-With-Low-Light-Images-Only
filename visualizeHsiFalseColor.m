@@ -1,4 +1,4 @@
-function falseColorImage = visualizeHsiFalseColor(HSI, waveStart_nm, waveEnd_nm, normalize)
+function falseColorImage = visualizeHsiFalseColor(HSI, waveStart_nm, waveEnd_nm, normalize, globalMax, globalMin)
     if nargin < 4
         normalize = 'none';
     end
@@ -27,6 +27,14 @@ function falseColorImage = visualizeHsiFalseColor(HSI, waveStart_nm, waveEnd_nm,
         R = R/max(R(:));
         G = G/max(G(:));
         B = B/max(B(:));
+    elseif strcmp(normalize, 'divideGlobalMax')
+        R = R/globalMax;
+        G = G/globalMax;
+        B = B/globalMax;
+    elseif strcmp(normalize, 'globalNorm')
+        R = (R - globalMin) / (globalMax - globalMin);
+        G = (G - globalMin) / (globalMax - globalMin);
+        B = (B - globalMin) / (globalMax - globalMin);
     elseif strcmp(normalize, 'divideGMax')
         R = R/maxx;
         G = G/maxx;
