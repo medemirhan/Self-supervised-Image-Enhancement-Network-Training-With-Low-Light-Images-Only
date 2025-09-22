@@ -3,20 +3,21 @@ import subprocess
 import yaml
 import os
 
+#------------------------ USER INPUTS START ------------------------#
+
 # Define parameter grid
 param_grid = {
-    'c_loss_reconstruction': [10,1000],
-    'c_loss_r_fidelity': [1,100],
-    'c_loss_i_smooth_low': [0.1,1,100],
-    'c_loss_i_smooth_delta': [1,20,2000],
-    'c_loss_fourier': [0.2,20],
-    'c_loss_spectral_cons': [1,100],
-    'alpha_i_smooth_low': [1, 0.1, 20],
-    'alpha_i_smooth_delta': [10, 1, 0.1],
+    'alpha_i_smooth_low': [0.1, 10, 50],
+    'alpha_i_smooth_delta': [1, 100, 1000],
 }
 
 # Path to the base config file
-base_config_path = './config/config_jyu_outdoor_simple_64.yml'
+base_config_path = './config/config_jyu_outdoor_64_aligned_simple.yml'
+
+user_model_name = 'jyu_outdoor_64_aligned_simple_mini_grid_search'
+
+#------------------------- USER INPUTS END -------------------------#
+
 with open(base_config_path, 'r') as f:
     base_config = yaml.safe_load(f)
 
@@ -50,7 +51,7 @@ for idx, combo in enumerate(combinations):
         command = [
             'python', 'main.py',
             '--config', config_path,
-            '--model_name', 'jyu_outdoor_simple_64_grid_search'
+            '--model_name', user_model_name
         ]
         # Run the subprocess. If it fails, CalledProcessError will be raised.
         subprocess.run(command, check=True, capture_output=True, text=True)
