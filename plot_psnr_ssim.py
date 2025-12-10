@@ -76,7 +76,7 @@ def plot_vectors(wavelengths, metrics, env, figsize=None, font_family='serif', f
     #plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
     plt.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), ncol=1)
     plt.tight_layout()
-    plt.savefig(save_path + "/psnr_vector_" + env + ".png", bbox_inches='tight')
+    plt.savefig(save_path + "/psnr_vector_" + env + ".eps", bbox_inches='tight')
 
     # ------------------------------
     # Figure 2: SSIM Plot
@@ -93,11 +93,11 @@ def plot_vectors(wavelengths, metrics, env, figsize=None, font_family='serif', f
     #plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(metrics)/2))
     plt.legend(loc='upper left', bbox_to_anchor=(1.01, 1.0), ncol=1)
     plt.tight_layout()
-    plt.savefig(save_path + "/ssim_vector_" + env + ".png", bbox_inches='tight')
+    plt.savefig(save_path + "/ssim_vector_" + env + ".eps", bbox_inches='tight')
 
 if __name__ == '__main__':
     
-    env = 'indoor'
+    env = 'jyu_outdoor'
     
     if env == 'indoor':
         globalMax=1.6697606
@@ -106,12 +106,12 @@ if __name__ == '__main__':
         d_tail=12
 
     else:
-        globalMax=1.7410845
+        globalMax=4095
         total_channels=204
         d_head=6
         d_tail=6
 
-    label_path = '../PairLIE/data/label_ll'
+    label_path = 'D:/jyu/selected_outdoor_64_registration_nonSaturated_splitted_v3/high/test'
     
     algorithms = {
         'SS-HSLIE (Ours)': {
@@ -138,8 +138,8 @@ if __name__ == '__main__':
             'matKeyPred': 'data',
             'matKeyGt': 'data'
         },
-        'HE': {
-            'preds_path': 'D:/results/comparison/he/' + env,
+        'EnlightenGAN': {
+            'preds_path': 'D:/results/comparison/enlightengan/' + env,
             'labels_path': label_path,
             'matKeyPred': 'data',
             'matKeyGt': 'data'
@@ -173,14 +173,40 @@ if __name__ == '__main__':
             'labels_path': label_path,
             'matKeyPred': 'data',
             'matKeyGt': 'data'
+        },
+        'CDAN': {
+            'preds_path': 'D:/results/comparison/cdan/' + env,
+            'labels_path': label_path,
+            'matKeyPred': 'data',
+            'matKeyGt': 'data'
+        },
+        'ExposureDiff': {
+            'preds_path': 'D:/results/comparison/exposure_diffusion/' + env,
+            'labels_path': label_path,
+            'matKeyPred': 'data',
+            'matKeyGt': 'data'
+        },
+        'Retinexformer': {
+            'preds_path': 'D:/results/comparison/retinexformer/' + env,
+            'labels_path': label_path,
+            'matKeyPred': 'data',
+            'matKeyGt': 'data'
+        },
+        'Retinexmamba': {
+            'preds_path': 'D:/results/comparison/retinexmamba/' + env,
+            'labels_path': label_path,
+            'matKeyPred': 'data',
+            'matKeyGt': 'data'
+        },
+        'MAFNet': {
+            'preds_path': 'D:/results/comparison/mafnet/' + env,
+            'labels_path': label_path,
+            'matKeyPred': 'data',
+            'matKeyGt': 'data'
         }
     }
 
-    if env == 'outdoor':
-        algorithms['HCANet']['preds_path'] += '/v2'
-        algorithms['RCILD']['preds_path'] += '/testOutdoorWithIndoorModel'
-        algorithms['RetinexNet']['preds_path'] += '/testOutdoorWithIndoorModel'
-    else:
+    if env != 'outdoor':
         algorithms['DHS Pr'] = {
             'preds_path': 'D:/results/comparison/deep_hs_prior/' + env,
             'labels_path': label_path,
@@ -208,5 +234,5 @@ if __name__ == '__main__':
         font_size=19,
         linewidth=3.5,
         axes_linewidth=1.2,
-        save_path='C:/Users/medemirhan/Desktop/jstsp/figures/results'
+        save_path='C:/Users/medemirhan/Desktop/jstsp_versions/revision_2/figures/results'
         )

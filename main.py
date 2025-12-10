@@ -10,6 +10,8 @@ import mlflow
 from model import LowLightEnhance
 from utils import load_hsi, Struct
 from metrics import calc_metrics
+from logger import Logger
+import sys
 
 def parse_args():
     default_values = {
@@ -74,8 +76,8 @@ def parse_args():
     postfix = ''
     args.timestamp = f'{datetime.now():{""}%Y%m%d_%H%M%S}'
     if args.phase == 'test':
-        args.timestamp = '20250404_014943' # enter timestamp manually
-        postfix = 'test'
+        postfix = '_test_' + args.timestamp
+        args.timestamp = '20250926_140412' # enter timestamp manually
 
     # Don't change
     args.full_model_name = args.model_name + '_' + args.timestamp + postfix
@@ -143,119 +145,139 @@ def eval_metrics(args):
     mlflow.log_metric("SAM", avg_sam.item())
 
 def main(args):
-    print("------ PARAMETERS ------")
-    for arg, value in vars(args).items():
-        print(f"{arg} : {value}")
-    print("------------------------")
+    log_filepath = os.path.join('logs', 'console_output_' + args.full_model_name + '.log')
+    original_stdout = sys.stdout
+    logger = Logger(log_filepath)
+    sys.stdout = logger
+    
+    try:
+        print(f"Console output is being logged to: {log_filepath}")
+        print("------ PARAMETERS ------")
+        for arg, value in vars(args).items():
+            print(f"{arg} : {value}")
+        print("------------------------")
 
-    # Set random seeds for reproducibility
-    random.seed(args.seed_value)
-    np.random.seed(args.seed_value)
-    torch.manual_seed(args.seed_value)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed_value)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    
-    device = torch.device("cuda" if args.use_gpu and torch.cuda.is_available() else "cpu")
-    print("Using device:", device)
-    
-    # Create model
-    model = LowLightEnhance(
-        input_channels=args.channels,
-        lr=args.start_lr,
-        lr_update_factor=args.lr_update_factor,
-        lr_update_period=args.lr_update_period,
-        time_stamp=args.timestamp,
-        c_loss_reconstruction=args.c_loss_reconstruction,
-        c_loss_r_fidelity=args.c_loss_r_fidelity,
-        c_loss_i_smooth_low=args.c_loss_i_smooth_low,
-        c_loss_i_smooth_delta=args.c_loss_i_smooth_delta,
-        c_loss_fourier=args.c_loss_fourier,
-        c_loss_spectral_cons=args.c_loss_spectral_cons,
-        alpha_i_smooth_low=args.alpha_i_smooth_low,
-        alpha_i_smooth_delta=args.alpha_i_smooth_delta,
-        device=device,
-        global_min=args.global_min,
-        global_max=args.global_max,
-        save_reflectance=args.save_reflectance,
-        save_illumination=args.save_illumination,
-        save_i_delta=args.save_i_delta
-    )
-    
-    model.to(device)
-    
-    # Load pretrained model if specified
-    if hasattr(args, 'pretrained_model') and args.pretrained_model and os.path.exists(args.pretrained_model):
-        print(f"Loading pretrained model from: {args.pretrained_model}")
-        checkpoint = torch.load(args.pretrained_model, map_location=device)
+        # Set random seeds for reproducibility
+        random.seed(args.seed_value)
+        np.random.seed(args.seed_value)
+        torch.manual_seed(args.seed_value)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed_value)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
         
-        # Handle different checkpoint formats
-        if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
-            model.load_state_dict(checkpoint['model_state_dict'])
-            print(f"Loaded model from epoch {checkpoint.get('epoch', 'unknown')}")
-        else:
-            model.load_state_dict(checkpoint)
+        device = torch.device("cuda" if args.use_gpu and torch.cuda.is_available() else "cpu")
+        print("Using device:", device)
         
-        print("Pretrained model loaded successfully!")
+        # Create model
+        model = LowLightEnhance(
+            input_channels=args.channels,
+            lr=args.start_lr,
+            lr_update_factor=args.lr_update_factor,
+            lr_update_period=args.lr_update_period,
+            time_stamp=args.timestamp,
+            c_loss_reconstruction=args.c_loss_reconstruction,
+            c_loss_r_fidelity=args.c_loss_r_fidelity,
+            c_loss_i_smooth_low=args.c_loss_i_smooth_low,
+            c_loss_i_smooth_delta=args.c_loss_i_smooth_delta,
+            c_loss_fourier=args.c_loss_fourier,
+            c_loss_spectral_cons=args.c_loss_spectral_cons,
+            alpha_i_smooth_low=args.alpha_i_smooth_low,
+            alpha_i_smooth_delta=args.alpha_i_smooth_delta,
+            device=device,
+            global_min=args.global_min,
+            global_max=args.global_max,
+            save_reflectance=args.save_reflectance,
+            save_illumination=args.save_illumination,
+            save_i_delta=args.save_i_delta
+        )
         
-        # Optionally freeze DecomNet for initial epochs
-        if hasattr(args, 'freeze_decom_epochs') and args.freeze_decom_epochs > 0:
-            print(f"DecomNet will be frozen for the first {args.freeze_decom_epochs} epochs")
-            model.freeze_decom_epochs = args.freeze_decom_epochs
-    
-    # If channels is not given, try to infer from the first training image.
-    train_files = sorted(glob(os.path.join(args.train_data, "*.*")))
-    if len(train_files) == 0:
-        print("No training files found.")
-        return
-    first_image = load_hsi(train_files[0], matContentHeader=args.mat_key,
-                           normalization=args.normalization,
-                           max_val=args.global_max, min_val=args.global_min)
-    if args.channels is None:
-        args.channels = first_image.shape[-1]
-    
-    mlflow.set_experiment(args.full_model_name)
-    with mlflow.start_run():
-        mlflow.log_param('phase', args.phase)
-        mlflow.log_param('data_min', args.global_min)
-        mlflow.log_param('data_max', args.global_max)
-        mlflow.log_param('seed', args.seed_value)
-        mlflow.log_param('patch_size', args.patch_size)
-        mlflow.log_param('model_name', args.full_model_name)
+        model.to(device)
+        
+        # Load pretrained model if specified
+        if hasattr(args, 'pretrained_model') and args.pretrained_model and os.path.exists(args.pretrained_model):
+            print(f"Loading pretrained model from: {args.pretrained_model}")
+            checkpoint = torch.load(args.pretrained_model, map_location=device)
+            
+            # Handle different checkpoint formats
+            if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                model.load_state_dict(checkpoint['model_state_dict'])
+                print(f"Loaded model from epoch {checkpoint.get('epoch', 'unknown')}")
+            else:
+                model.load_state_dict(checkpoint)
+            
+            print("Pretrained model loaded successfully!")
+            
+            # Optionally freeze DecomNet for initial epochs
+            if hasattr(args, 'freeze_decom_epochs') and args.freeze_decom_epochs > 0:
+                print(f"DecomNet will be frozen for the first {args.freeze_decom_epochs} epochs")
+                model.freeze_decom_epochs = args.freeze_decom_epochs
+        
+        # If channels is not given, try to infer from the first training image.
+        train_files = sorted(glob(os.path.join(args.train_data, "*.*")))
+        if len(train_files) == 0:
+            print("No training files found.")
+            return
+        first_image = load_hsi(train_files[0], matContentHeader=args.mat_key,
+                            normalization=args.normalization,
+                            max_val=args.global_max, min_val=args.global_min)
+        if args.channels is None:
+            args.channels = first_image.shape[-1]
+        
+        mlflow.set_experiment(args.full_model_name)
+        with mlflow.start_run():
+            mlflow.log_param('phase', args.phase)
+            mlflow.log_param('data_min', args.global_min)
+            mlflow.log_param('data_max', args.global_max)
+            mlflow.log_param('seed', args.seed_value)
+            mlflow.log_param('patch_size', args.patch_size)
+            mlflow.log_param('model_name', args.full_model_name)
 
-        mlflow.log_param('c_loss_reconstruction', args.c_loss_reconstruction)
-        mlflow.log_param('c_loss_r_fidelity', args.c_loss_r_fidelity)
-        mlflow.log_param('c_loss_i_smooth_low', args.c_loss_i_smooth_low)
-        mlflow.log_param('c_loss_i_smooth_delta', args.c_loss_i_smooth_delta)
-        mlflow.log_param('c_loss_fourier', args.c_loss_fourier)
-        mlflow.log_param('c_loss_spectral_cons', args.c_loss_spectral_cons)
-        mlflow.log_param('alpha_i_smooth_low', args.alpha_i_smooth_low)
-        mlflow.log_param('alpha_i_smooth_delta', args.alpha_i_smooth_delta)
+            mlflow.log_param('c_loss_reconstruction', args.c_loss_reconstruction)
+            mlflow.log_param('c_loss_r_fidelity', args.c_loss_r_fidelity)
+            mlflow.log_param('c_loss_i_smooth_low', args.c_loss_i_smooth_low)
+            mlflow.log_param('c_loss_i_smooth_delta', args.c_loss_i_smooth_delta)
+            mlflow.log_param('c_loss_fourier', args.c_loss_fourier)
+            mlflow.log_param('c_loss_spectral_cons', args.c_loss_spectral_cons)
+            mlflow.log_param('alpha_i_smooth_low', args.alpha_i_smooth_low)
+            mlflow.log_param('alpha_i_smooth_delta', args.alpha_i_smooth_delta)
 
-        mlflow.log_artifact('main.py')
-        mlflow.log_artifact('model.py')
-        mlflow.log_artifact('utils.py')
-        mlflow.log_artifact('metrics.py')
-        mlflow.log_artifact('main.py')
-        mlflow.log_artifact(args.config)
-        
-        if args.phase == 'train':
-            mlflow.log_param('data_train', args.train_data)
-            train(model, args)
-        elif args.phase == 'test':
-            mlflow.log_param('data_test', args.test_data)
-            test(model, args)
-            eval_metrics(args)
-        elif args.phase == 'train_and_test':
-            mlflow.log_param('data_train', args.train_data)
-            mlflow.log_param('data_test', args.test_data)
-            train(model, args)
-            test(model, args)
-            eval_metrics(args)
-        else:
-            print('[!] Unknown phase')
-            exit(0)
+            mlflow.log_artifact('main.py')
+            mlflow.log_artifact('model.py')
+            mlflow.log_artifact('utils.py')
+            mlflow.log_artifact('metrics.py')
+            mlflow.log_artifact('main.py')
+            mlflow.log_artifact(args.config)
+            
+            if args.phase == 'train':
+                mlflow.log_param('data_train', args.train_data)
+                train(model, args)
+            elif args.phase == 'test':
+                mlflow.log_param('data_test', args.test_data)
+                test(model, args)
+                eval_metrics(args)
+            elif args.phase == 'train_and_test':
+                mlflow.log_param('data_train', args.train_data)
+                mlflow.log_param('data_test', args.test_data)
+                train(model, args)
+                test(model, args)
+                eval_metrics(args)
+            else:
+                print('[!] Unknown phase')
+            
+            mlflow.log_artifact(log_filepath, artifact_path="run_logs")
+    
+    except Exception as e:
+        print(f"\n--- An error occurred: {e} ---")
+        import traceback
+        traceback.print_exc()
+
+    finally:
+        # --- Restore stdout and close the log file ---
+        if 'logger' in locals() and sys.stdout == logger:
+            sys.stdout = original_stdout
+            logger.close()
+        print(f"Final console output log is available at: {log_filepath}")
 
 if __name__ == '__main__':
     args = parse_args()

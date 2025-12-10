@@ -1,4 +1,4 @@
-function falseColorImage = visualizeHsiFalseColor(HSI, waveStart_nm, waveEnd_nm, normalize, globalMax, globalMin)
+function falseColorImage = visualizeHsiFalseColor_indoor(HSI, waveStart_nm, waveEnd_nm, normalize, globalMax, globalMin)
     if nargin < 4
         normalize = 'none';
     end

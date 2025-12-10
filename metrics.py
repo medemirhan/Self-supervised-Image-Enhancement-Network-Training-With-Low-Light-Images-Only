@@ -152,11 +152,19 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
 
 if __name__ == '__main__':
 
-    globalMin = 0.1167562
-    globalMax = 1.7410845
+    globalMin = 238.
+    globalMax = 4095.
 
-    im_dir = 'D:/results/comparison/rcild/outdoor/testOutdoorWithIndoorModel/*.mat'
+    im_dir = 'D:/results/comparison/low/jyu_outdoor/*.mat'
+    label_dir = 'D:/results/comparison/normal/jyu_outdoor'
+    
+    '''
+    globalMin = 0.0708354
+    globalMax = 1.6697606
+
+    im_dir = 'D:/results/comparison/enlightengan/indoor/test_400/*.mat'
     label_dir = '../PairLIE/data/label_ll'
+    '''
 
     avg_psnr, avg_ssim, avg_sam = calc_metrics(
         im_dir=os.path.normpath(im_dir),

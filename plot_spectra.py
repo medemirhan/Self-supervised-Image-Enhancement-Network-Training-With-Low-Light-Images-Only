@@ -81,9 +81,10 @@ if __name__ == '__main__':
 
     # Paths, keys, titles
     # Build a list of dictionaries similar to the dataToCompare array in MATLAB.
-    save_path='C:/Users/medemirhan/Desktop/tez/latex/figures/results'
+    #save_path='C:/Users/medemirhan/Desktop/jstsp_versions/revision_2/figures/results'
+    save_path='C:/Users/medemirhan/Desktop/tez'
 
-    indoor = 1
+    indoor = 0
     if indoor:
         mat_name = 'vegatables5'
         data_to_compare = [
@@ -95,19 +96,41 @@ if __name__ == '__main__':
             {"path": rf"D:\results\comparison\deep_hs_prior\indoor\{mat_name}.mat", "key": "pred", "label": "DeepHS Pr."},
             {"path": rf"D:\results\comparison\fast_hy_mix\indoor\{mat_name}.mat", "key": "data", "label": "FastHyMix"},
             {"path": rf"D:\results\comparison\hcanet\indoor\{mat_name}.mat",       "key": "data", "label": "HCANet"},
-            {"path": rf"D:\results\comparison\he\indoor\{mat_name}.mat",           "key": "data", "label": "HE"},
+            {"path": rf"D:\results\comparison\enlightengan\indoor\{mat_name}.mat",           "key": "data", "label": "EnlightenGAN"},
             {"path": rf"D:\results\comparison\lrtdtv\indoor\{mat_name}.mat",        "key": "data", "label": "LRTDTV"},
             {"path": rf"D:\results\comparison\mr\indoor\{mat_name}.mat",            "key": "data", "label": "MR"},
-            #{"path": rf"D:\results\comparison\rctv\indoor\{mat_name}.mat",           "key": "output", "label": "RCTV"},
             {"path": rf"D:\results\comparison\rcild\indoor\{mat_name}.mat",           "key": "data", "label": "RCILD"},
-            {"path": rf"D:\results\comparison\retinexnet\indoor\{mat_name}.mat",     "key": "data", "label": "RetinexNet"}
+            {"path": rf"D:\results\comparison\retinexnet\indoor\{mat_name}.mat",     "key": "data", "label": "RetinexNet"},
+            {"path": rf"D:\results\comparison\exposure_diffusion\indoor\{mat_name}.mat",     "key": "data", "label": "ExposureDiff"},
+            {"path": rf"D:\results\comparison\cdan\indoor\{mat_name}.mat",     "key": "data", "label": "CDAN"},
+            {"path": rf"D:\results\comparison\mafnet\indoor\{mat_name}.mat",     "key": "data", "label": "MAFNet"},
+            {"path": rf"D:\results\comparison\retinexformer\indoor\{mat_name}.mat",     "key": "data", "label": "Retinexformer"},
+            {"path": rf"D:\results\comparison\retinexmamba\indoor\{mat_name}.mat",     "key": "data", "label": "Retinexmamba"}
         ]
-        x_locs = [131, 134, 253, 327]
-        y_locs = [57, 214, 146, 158]
+        #bblock:
+        '''x_locs = [131, 134, 253, 327]
+        y_locs = [47, 214, 146, 158]'''
+        
+        #corn
+        '''x_locs = [95, 252, 233, 330]
+        y_locs = [190, 101, 274, 190]'''
+
+        #huanggua
+        '''x_locs = [160, 115, 306, 337]
+        y_locs = [106, 267, 183, 239]'''
+
+        #orange_apple
+        '''x_locs = [219, 220, 100]
+        y_locs = [109, 336, 200]'''
+
+        #vegatables5
+        x_locs = [129, 127, 254, 344]
+        y_locs = [59, 219, 144, 147]
+
         waveStart_nm = 453.8117
         waveEnd_nm = 962.3318
     else:
-        mat_name = '007_2_2021-01-20_024'
+        '''mat_name = '007_2_2021-01-20_024'
         data_to_compare = [
             {"path": rf"D:\results\comparison\normal\outdoor\{mat_name}.mat", "key": "data", "label": "Ground Truth"},
             {"path": rf"D:\results\comparison\ours\outdoor\{mat_name}.mat",   "key": "ref",  "label": "SS-HSLIE (Ours)"},
@@ -127,7 +150,32 @@ if __name__ == '__main__':
         x_locs = [75, 160, 250, 425]
         y_locs = [175, 340, 325, 420]
         waveStart_nm = 407.73399
-        waveEnd_nm = 976.35468
+        waveEnd_nm = 976.35468'''
+        mat_name = '486'
+        data_to_compare = [
+            {"path": rf"D:\results\comparison\normal\jyu_outdoor\{mat_name}.mat", "key": "data", "label": "Ground Truth"},
+            {"path": rf"D:\results\comparison\ours\jyu_outdoor\{mat_name}.mat",   "key": "ref",  "label": "SS-HSLIE (Ours)"},
+            {"path": rf"D:\results\comparison\low\jyu_outdoor\{mat_name}.mat",    "key": "data", "label": "Low-light"},
+            {"path": rf"D:\results\comparison\bm4d\jyu_outdoor\{mat_name}.mat",    "key": "data", "label": "BM4D"},
+            {"path": rf"D:\results\comparison\clahe\jyu_outdoor\{mat_name}.mat",   "key": "data", "label": "CLAHE"},
+            {"path": rf"D:\results\comparison\deep_hs_prior\jyu_outdoor\{mat_name}.mat", "key": "pred", "label": "DeepHS Pr."},
+            {"path": rf"D:\results\comparison\fast_hy_mix\jyu_outdoor\{mat_name}.mat", "key": "data", "label": "FastHyMix"},
+            {"path": rf"D:\results\comparison\hcanet\jyu_outdoor\{mat_name}.mat",       "key": "data", "label": "HCANet"},
+            {"path": rf"D:\results\comparison\enlightengan\jyu_outdoor\{mat_name}.mat",           "key": "data", "label": "EnlightenGAN"},
+            {"path": rf"D:\results\comparison\lrtdtv\jyu_outdoor\{mat_name}.mat",        "key": "data", "label": "LRTDTV"},
+            {"path": rf"D:\results\comparison\mr\jyu_outdoor\{mat_name}.mat",            "key": "data", "label": "MR"},
+            {"path": rf"D:\results\comparison\rcild\jyu_outdoor\{mat_name}.mat",           "key": "data", "label": "RCILD"},
+            {"path": rf"D:\results\comparison\retinexnet\jyu_outdoor\{mat_name}.mat",     "key": "data", "label": "RetinexNet"},
+            {"path": rf"D:\results\comparison\exposure_diffusion\jyu_outdoor\{mat_name}.mat",     "key": "data", "label": "ExposureDiff"},
+            {"path": rf"D:\results\comparison\cdan\jyu_outdoor\{mat_name}.mat",     "key": "data", "label": "CDAN"},
+            {"path": rf"D:\results\comparison\mafnet\jyu_outdoor\{mat_name}.mat",     "key": "data", "label": "MAFNet"},
+            {"path": rf"D:\results\comparison\retinexformer\jyu_outdoor\{mat_name}.mat",     "key": "data", "label": "Retinexformer"},
+            {"path": rf"D:\results\comparison\retinexmamba\jyu_outdoor\{mat_name}.mat",     "key": "data", "label": "Retinexmamba"}
+        ]
+        x_locs = [272, 110, 374, 56]
+        y_locs = [149, 71, 385, 459]
+        waveStart_nm = 414.63
+        waveEnd_nm = 985.05
 
     # Parameters
     # These locations and parameters come directly from the MATLAB code.
@@ -139,6 +187,7 @@ if __name__ == '__main__':
     mat_contents = loadmat(first_entry["path"])
     # Extract the field specified by the key.
     data_field = mat_contents[first_entry["key"]]
+    #data_field = np.rot90(data_field, k=-1, axes=(0, 1))
     # Assume the data is in shape (h, w, c)
     h, w, c = data_field.shape
     # Create a list to accumulate the hyperspectral images.
@@ -148,6 +197,7 @@ if __name__ == '__main__':
     for entry in data_to_compare[1:]:
         mat_contents = loadmat(entry["path"])
         cur_data = mat_contents[entry["key"]]
+        #cur_data = np.rot90(data_field, k=-1, axes=(0, 1))
         # Optionally, check that cur_data.shape matches (h,w,c)
         hs_images.append(cur_data)
 
@@ -275,7 +325,7 @@ if __name__ == '__main__':
             legend_labels.append(data_to_compare[j]["label"])
         
         plt.xlabel('Band Number')
-        plt.ylabel('Reflectance')
+        plt.ylabel('Intensity')
         #plt.legend(legend_labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), ncol=math.ceil(len(data_to_compare)/2))
         plt.legend(legend_labels, loc='upper left', bbox_to_anchor=(1.01, 1.0), ncol=1)
         plt.tight_layout()

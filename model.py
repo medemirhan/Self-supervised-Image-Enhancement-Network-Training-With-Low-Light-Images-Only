@@ -373,7 +373,8 @@ class LowLightEnhance(nn.Module):
                 # Convert tensor to numpy array for saving
                 S_np = S.squeeze(0).permute(1, 2, 0).cpu().numpy()
 
-				#################################2
+                if self.global_min != None and self.global_max != None:
+                    S_np = S_np * (self.global_max - self.global_min) + self.global_min
                 
                 # Save the resulting image
                 save_hsi(os.path.join(epoch_eval_dir, filename), S_np)
@@ -426,7 +427,9 @@ class LowLightEnhance(nn.Module):
                 total_run_time += run_time
                 S_np = S.squeeze(0).permute(1, 2, 0).cpu().numpy()
 
-				#################################1
+                if self.global_min != None and self.global_max != None:
+                    S_np = S_np * (self.global_max - self.global_min) + self.global_min
+                
                 save_hsi(os.path.join(save_dir, filename), S_np)
 
                 artifact_dir = os.path.join(save_dir, 'artifacts')

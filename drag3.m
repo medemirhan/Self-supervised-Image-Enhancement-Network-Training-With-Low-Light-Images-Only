@@ -3,32 +3,48 @@ clear all
 close all
 clc
 
+mmname = 'huanggua';
+
+%%
+global whiteCal;
+whiteCal = false;
+
 %% ---- USER SETTINGS -------------------------------------------------------
 % 1st image
-IM(1).imdir  = 'D:\jyu\selected_outdoor_64_aligned_simple\high\test\';
-IM(1).imname = '486';
+IM(1).imdir  = 'C:\Users\medemirhan\Desktop\n2n\PairLIE\data\label_ll\';
+IM(1).imname = mmname;
 IM(1).key    = 'data';
 IM(1).title  = 'gt';
 
 % 2nd image
-IM(2).imdir  = 'D:\jyu\selected_outdoor_64_aligned_simple\low\test\';
-IM(2).imname = '486';
+IM(2).imdir  = 'C:\Users\medemirhan\Desktop\n2n\PairLIE\data\hsi_dataset_indoor_only\train\';
+IM(2).imname = mmname;
 IM(2).key    = 'data';
 IM(2).title  = 'low';
+% 
+% % 3rd image
+% IM(3).imdir  = 'D:\sslie\test_results_jyu_outdoor_64_registration_nonSaturated_splitted_v2_20250924_045002\';
+% IM(3).imname = mmname;
+% IM(3).key    = 'ref';
+% IM(3).title  = 'enhanced';
+% 
+% % 3rd image
+% IM(4).imdir  = 'D:\sslie\test_results_jyu_outdoor_64_registration_nonSaturated_splitted_v2_20250924_045002\artifacts\';
+% IM(4).imname = mmname;
+% IM(4).key    = 'ref';
+% IM(4).title  = 'reflectance';
 
-% 3rd image
-IM(3).imdir  = 'D:\sslie\test_results_jyu_outdoor_64_aligned_simple_20250916_021912\artifacts\';
-IM(3).imname = '486_R_low';
-IM(3).key    = 'ref';
-IM(3).title  = 'reflectance';
+global whiteRegionTopXY;
+global whitCalWinSize;
+whitCalWinSize = [10,10];
 
-% 3rd image
-IM(4).imdir  = 'D:\sslie\test_results_jyu_outdoor_64_aligned_simple_20250916_021912\';
-IM(4).imname = '486';
-IM(4).key    = 'ref';
-IM(4).title  = 'enhanced';
-
-rotateImages = true;
+if strcmp(mmname,'328')
+    whiteRegionTopXY = [65,385];
+elseif strcmp(mmname,'486')
+    whiteRegionTopXY = [365,345];
+elseif strcmp(mmname,'492')
+    whiteRegionTopXY = [455,150];
+end
 
 % Wavelength range (must match the cubes)
 % waveStart_nm = 397.32;
@@ -63,9 +79,11 @@ for i = 1:N
     sizesHW(i,:) = [h,w];
     bandCounts(i) = c;
     
-%     if i == 3
-%         datas{i} = datas{i} * (4095 - 238) + 238;
-%     end
+    if i == 4
+        datas{i} = datas{i} * (4095 - 238) + 238;
+    end
+    
+    %datas{i} = rot90(datas{i}, -1);
     
     HSI_cells{end+1} = datas{i};
 end
@@ -105,9 +123,7 @@ colors = lines(N);
 for i = 1:N
     ax(i) = nexttile(i);
     imgShow = imRGB{i};
-    if rotateImages
-        imgShow = imrotate(imRGB{i}, -90);  % 90° clockwise
-    end
+
     imshow(imgShow, 'Parent', ax(i));
     title(ax(i), sprintf('%s', IM(i).title), 'Interpreter','none');
     hold(ax(i), 'on');
@@ -136,7 +152,7 @@ else
     xlabel(ax_spec, 'Band Index');
 end
 ylabel(ax_spec, 'Intensity');
-title(ax_spec, 'Drag any cursor; spectra update for ALL images');
+%title(ax_spec, 'Drag any cursor; spectra update for ALL images');
 
 % One line per image
 ln = gobjects(1,N);
@@ -189,12 +205,20 @@ end
 
 function [Y, labels] = computeAllSpectra(datas, x, y, win, IM)
     % Returns (C x N) matrix Y and labels for legend
+    global whiteRegionTopXY;
+    global whitCalWinSize;
+    global whiteCal;
     Nloc = numel(datas);
     C = size(datas{1},3);
     Y = zeros(C, Nloc);
     labels = cell(1, Nloc);
     for k = 1:Nloc
-        Y(:,k) = getSpectrum(datas{k}, x, y, win);
+        if whiteCal
+            normData = normalizeByWhiteRegion(datas{k}, whiteRegionTopXY, whitCalWinSize);
+            Y(:,k) = getSpectrum(normData, x, y, win);
+        else
+            Y(:,k) = getSpectrum(datas{k}, x, y, win);
+        end
         labels{k} = sprintf('%s @ (%d,%d)', IM(k).title, x, y);
     end
 end
