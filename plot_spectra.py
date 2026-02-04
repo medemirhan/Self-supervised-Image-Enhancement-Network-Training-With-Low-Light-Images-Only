@@ -81,11 +81,11 @@ if __name__ == '__main__':
 
     # Paths, keys, titles
     # Build a list of dictionaries similar to the dataToCompare array in MATLAB.
-    #save_path='C:/Users/medemirhan/Desktop/jstsp_versions/revision_2/figures/results'
-    save_path='C:/Users/medemirhan/Desktop/tez'
+    save_path='C:/Users/medemirhan/Desktop/tez/thesis/figures/results'
 
-    indoor = 0
-    if indoor:
+    dataset = 2 # 0: jyu_outdoor, 2: jyu_indoor, 1: other indoor
+
+    if dataset == 1:
         mat_name = 'vegatables5'
         data_to_compare = [
             {"path": rf"D:\results\comparison\normal\indoor\{mat_name}.mat", "key": "data", "label": "Ground Truth"},
@@ -129,28 +129,8 @@ if __name__ == '__main__':
 
         waveStart_nm = 453.8117
         waveEnd_nm = 962.3318
-    else:
-        '''mat_name = '007_2_2021-01-20_024'
-        data_to_compare = [
-            {"path": rf"D:\results\comparison\normal\outdoor\{mat_name}.mat", "key": "data", "label": "Ground Truth"},
-            {"path": rf"D:\results\comparison\ours\outdoor\{mat_name}.mat",   "key": "ref",  "label": "SS-HSLIE (Ours)"},
-            {"path": rf"D:\results\comparison\low\outdoor\{mat_name}.mat",    "key": "data", "label": "Low-light"},
-            {"path": rf"D:\results\comparison\bm4d\outdoor\{mat_name}.mat",    "key": "data", "label": "BM___"},
-            {"path": rf"D:\results\comparison\clahe\outdoor\{mat_name}.mat",   "key": "data", "label": "CLAHE"},
-            #{"path": rf"D:\results\comparison\deep_hs_prior\outdoor\{mat_name}.mat", "key": "pred", "label": "DHS___"},
-            {"path": rf"D:\results\comparison\fast_hy_mix\outdoor\{mat_name}.mat", "key": "data", "label": "FastHyMix"},
-            {"path": rf"D:\results\comparison\hcanet\outdoor\v2\{mat_name}.mat",       "key": "data", "label": "HCANet"},
-            {"path": rf"D:\results\comparison\he\outdoor\{mat_name}.mat",           "key": "data", "label": "HE"},
-            {"path": rf"D:\results\comparison\lrtdtv\outdoor\{mat_name}.mat",        "key": "data", "label": "LRTDTV"},
-            {"path": rf"D:\results\comparison\mr\outdoor\{mat_name}.mat",            "key": "data", "label": "MR"},
-            #{"path": rf"D:\results\comparison\rctv\outdoor\{mat_name}.mat",           "key": "output", "label": "RCTV"},
-            {"path": rf"D:\results\comparison\rcild\outdoor\testOutdoorWithIndoorModel\{mat_name}.mat",           "key": "data", "label": "RCILD"},
-            {"path": rf"D:\results\comparison\retinexnet\outdoor\testOutdoorWithIndoorModel\{mat_name}.mat",     "key": "data", "label": "RetinexNet"}
-        ]
-        x_locs = [75, 160, 250, 425]
-        y_locs = [175, 340, 325, 420]
-        waveStart_nm = 407.73399
-        waveEnd_nm = 976.35468'''
+
+    elif dataset == 0:
         mat_name = '486'
         data_to_compare = [
             {"path": rf"D:\results\comparison\normal\jyu_outdoor\{mat_name}.mat", "key": "data", "label": "Ground Truth"},
@@ -174,6 +154,33 @@ if __name__ == '__main__':
         ]
         x_locs = [272, 110, 374, 56]
         y_locs = [149, 71, 385, 459]
+        waveStart_nm = 414.63
+        waveEnd_nm = 985.05
+
+    elif dataset == 2:
+        mat_name = '678'
+        data_to_compare = [
+            {"path": rf"D:\results\comparison\normal\jyu_indoor\{mat_name}.mat", "key": "data", "label": "Ground Truth"},
+            {"path": rf"D:\results\comparison\ours\jyu_indoor\{mat_name}.mat",   "key": "ref",  "label": "SS-HSLIE (Ours)"},
+            {"path": rf"D:\results\comparison\low\jyu_indoor\{mat_name}.mat",    "key": "data", "label": "Low-light"},
+            {"path": rf"D:\results\comparison\bm4d\jyu_indoor\{mat_name}.mat",    "key": "data", "label": "BM4D"},
+            {"path": rf"D:\results\comparison\clahe\jyu_indoor\{mat_name}.mat",   "key": "data", "label": "CLAHE"},
+            {"path": rf"D:\results\comparison\deep_hs_prior\jyu_indoor\{mat_name}.mat", "key": "pred", "label": "DeepHS Pr."},
+            {"path": rf"D:\results\comparison\fast_hy_mix\jyu_indoor\{mat_name}.mat", "key": "data", "label": "FastHyMix"},
+            {"path": rf"D:\results\comparison\hcanet\jyu_indoor\{mat_name}.mat",       "key": "data", "label": "HCANet"},
+            {"path": rf"D:\results\comparison\enlightengan\jyu_indoor\{mat_name}.mat",           "key": "data", "label": "EnlightenGAN"},
+            {"path": rf"D:\results\comparison\lrtdtv\jyu_indoor\{mat_name}.mat",        "key": "data", "label": "LRTDTV"},
+            {"path": rf"D:\results\comparison\mr\jyu_indoor\{mat_name}.mat",            "key": "data", "label": "MR"},
+            {"path": rf"D:\results\comparison\rcild\jyu_indoor\{mat_name}.mat",           "key": "data", "label": "RCILD"},
+            {"path": rf"D:\results\comparison\retinexnet\jyu_indoor\{mat_name}.mat",     "key": "data", "label": "RetinexNet"},
+            {"path": rf"D:\results\comparison\exposure_diffusion\jyu_indoor\{mat_name}.mat",     "key": "data", "label": "ExposureDiff"},
+            {"path": rf"D:\results\comparison\cdan\jyu_indoor\{mat_name}.mat",     "key": "data", "label": "CDAN"},
+            {"path": rf"D:\results\comparison\mafnet\jyu_indoor\{mat_name}.mat",     "key": "data", "label": "MAFNet"},
+            {"path": rf"D:\results\comparison\retinexformer\jyu_indoor\{mat_name}.mat",     "key": "data", "label": "Retinexformer"},
+            {"path": rf"D:\results\comparison\retinexmamba\jyu_indoor\{mat_name}.mat",     "key": "data", "label": "Retinexmamba"}
+        ]
+        x_locs = [194, 300, 110, 245]
+        y_locs = [103, 180, 325, 440]
         waveStart_nm = 414.63
         waveEnd_nm = 985.05
 
@@ -267,9 +274,9 @@ if __name__ == '__main__':
         
         # Save the figure; here we save each figure separately.
         # For example, name files "hs_image_0.png", "hs_image_1.png", etc.
-        filename = "hs_image_" + mat_name + "_" + str(indoor) + ".eps"
+        filename = "hs_image_" + mat_name + "_" + str(dataset) + ".eps"
         plt.tight_layout()
-        plt.savefig(os.path.join(save_path, filename), dpi=300, bbox_inches='tight')
+        #plt.savefig(os.path.join(save_path, filename), dpi=300, bbox_inches='tight')
         plt.close()
 
     plt.rcParams.update({
@@ -330,7 +337,7 @@ if __name__ == '__main__':
         plt.legend(legend_labels, loc='upper left', bbox_to_anchor=(1.01, 1.0), ncol=1)
         plt.tight_layout()
         # Save the spectrum plot as a separate file.
-        spectrum_filename = f"spectrum_at_{letter}_{str(indoor)}_{mat_name}.eps"
+        spectrum_filename = f"spectrum_at_{letter}_{str(dataset)}_{mat_name}.eps"
         plt.tight_layout()
         plt.savefig(os.path.join(save_path, spectrum_filename), bbox_inches='tight')
         plt.close()

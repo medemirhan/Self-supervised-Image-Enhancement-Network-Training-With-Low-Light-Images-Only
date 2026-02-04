@@ -3,7 +3,7 @@ clear all
 close all
 clc
 
-mmname = 'huanggua';
+mmname = '254';
 
 %%
 global whiteCal;
@@ -11,13 +11,13 @@ whiteCal = false;
 
 %% ---- USER SETTINGS -------------------------------------------------------
 % 1st image
-IM(1).imdir  = 'C:\Users\medemirhan\Desktop\n2n\PairLIE\data\label_ll\';
+IM(1).imdir  = 'D:\jyu\jyu_indoor\only_low_psnrs_64_aligned\high\train\';
 IM(1).imname = mmname;
 IM(1).key    = 'data';
 IM(1).title  = 'gt';
 
 % 2nd image
-IM(2).imdir  = 'C:\Users\medemirhan\Desktop\n2n\PairLIE\data\hsi_dataset_indoor_only\train\';
+IM(2).imdir  = 'D:\jyu\jyu_indoor\only_low_psnrs_64_aligned\lowAligned\train\';
 IM(2).imname = mmname;
 IM(2).key    = 'data';
 IM(2).title  = 'low';

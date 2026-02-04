@@ -155,14 +155,14 @@ if __name__ == '__main__':
     globalMin = 238.
     globalMax = 4095.
 
-    im_dir = 'D:/results/comparison/low/jyu_outdoor/*.mat'
-    label_dir = 'D:/results/comparison/normal/jyu_outdoor'
+    im_dir = 'D:/results/comparison/enlightengan/jyu_indoor_v2/*.mat'
+    label_dir = 'D:/results/comparison/normal/jyu_indoor_v2'
     
-    '''
-    globalMin = 0.0708354
+    
+    '''globalMin = 0.0708354
     globalMax = 1.6697606
 
-    im_dir = 'D:/results/comparison/enlightengan/indoor/test_400/*.mat'
+    im_dir = 'D:/sslie/test_results_indoor_1000_epoch_20251214_234340/*.mat'
     label_dir = '../PairLIE/data/label_ll'
     '''
 
