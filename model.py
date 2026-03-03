@@ -10,10 +10,9 @@ import mlflow
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.use('Agg')
-from sklearn.decomposition import PCA
 import metrics
 
-from utils import pca_projection, save_hsi, data_augmentation, load_hsi
+from utils import save_hsi, data_augmentation, load_hsi
 
 def conv(in_channels, out_channels, kernel_size, stride=1, padding=None, activation=True):
     if padding is None:
@@ -23,9 +22,9 @@ def conv(in_channels, out_channels, kernel_size, stride=1, padding=None, activat
         layers.append(nn.ReLU(inplace=True))
     return nn.Sequential(*layers)
 
-class DecomNet(nn.Module):
+class DecompositionNet(nn.Module):
     def __init__(self, in_channels, channel=64, kernel_size=3):
-        super(DecomNet, self).__init__()
+        super(DecompositionNet, self).__init__()
         self.in_channels = in_channels
         self.channel = channel
         self.kernel_size = kernel_size
@@ -119,9 +118,9 @@ class TransformerBlock(nn.Module):
         output = output_seq.permute(0, 2, 1).view(N, C, H, W)
         return output
 
-class RelightNet(nn.Module):
+class IllumAdjustmentNet(nn.Module):
     def __init__(self, in_channels, channel=64, kernel_size=3, use_attention=False, use_transformer=True):
-        super(RelightNet, self).__init__()
+        super(IllumAdjustmentNet, self).__init__()
         # After concatenation, input channels become in_channels + 1.
         self.conv0 = conv(in_channels + 1, channel, kernel_size, activation=False)
         self.conv1 = conv(channel, channel, kernel_size, stride=2, activation=True)
@@ -208,11 +207,11 @@ class LowLightEnhance(nn.Module):
         if abs(self.lr_update_factor - 1) > 1e-6:
             self.adaptive_lr = True
 
-        self.decom_net = DecomNet(in_channels=input_channels)
-        self.relight_net = RelightNet(in_channels=input_channels)
+        self.decomposition_net = DecompositionNet(in_channels=input_channels)
+        self.illum_adjust_net = IllumAdjustmentNet(in_channels=input_channels)
         
         self.optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        self.freeze_decom_epochs = 0  # Number of epochs to freeze DecomNet
+        self.freeze_decom_epochs = 0
         
         if self.adaptive_lr:
             self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.lr_update_period, gamma=self.lr_update_factor)
@@ -229,29 +228,24 @@ class LowLightEnhance(nn.Module):
 
     def forward(self, input_low):
         # input_low: (N, input_channels, H, W)
-        R_low, I_low = self.decom_net(input_low)
-        I_delta = self.relight_net(I_low, R_low)
+        R_low, I_low = self.decomposition_net(input_low)
+        I_delta = self.illum_adjust_net(I_low, R_low)
         S = R_low * I_delta + R_low * I_low
         return R_low, I_low, I_delta, S
     
     def train_model(self, train_data_path, eval_data_path, batch_size, patch_size, num_epochs, start_lr, ckpt_dir, eval_result_dir, eval_every_epoch, label_dir, plot_every_epoch=10):
-        ckpt_dir = os.path.join(ckpt_dir, 'Decom_' + self.time_stamp)
+        ckpt_dir = os.path.join(ckpt_dir, 'Decomposition_' + self.time_stamp)
         
         os.makedirs(ckpt_dir, exist_ok=True)
         os.makedirs(eval_result_dir, exist_ok=True)
-        train_files = sorted(glob(os.path.join(train_data_path, "*.*")))
+        train_files = sorted(glob(os.path.join(train_data_path, "*.mat")))
         train_low_data = []
-        train_high_data = []
         for file in train_files:
             low_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=self.global_max, min_val=self.global_min)
             train_low_data.append(low_im)
-            high_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=self.global_max, min_val=self.global_min)
-            train_high_data.append(high_im)
-            low_eq = pca_projection(low_im)
-            if low_eq.ndim == 2:
-                low_eq = low_eq[:, :, None]
+
         eval_low_data = []
-        eval_files = sorted(glob(os.path.join(eval_data_path, "*.*")))
+        eval_files = sorted(glob(os.path.join(eval_data_path, "*.mat")))
         for file in eval_files:
             eval_im = load_hsi(file, matContentHeader='data', normalization='global_normalization', max_val=self.global_max, min_val=self.global_min)
             eval_low_data.append(eval_im)
@@ -276,22 +270,22 @@ class LowLightEnhance(nn.Module):
         mlflow.log_artifact(summary_path)
 
         for epoch in range(num_epochs):
-            # Handle DecomNet freezing/unfreezing
+            # Handle DecompositionNet freezing/unfreezing
             if hasattr(self, 'freeze_decom_epochs') and self.freeze_decom_epochs > 0:
                 if epoch < self.freeze_decom_epochs:
-                    # Freeze DecomNet parameters
-                    for param in self.decom_net.parameters():
+                    # Freeze DecompositionNet parameters
+                    for param in self.decomposition_net.parameters():
                         param.requires_grad = False
-                    print(f"Epoch {epoch+1}: DecomNet frozen")
+                    print(f"Epoch {epoch+1}: DecompositionNet frozen")
                 elif epoch == self.freeze_decom_epochs:
-                    # Unfreeze DecomNet parameters
-                    for param in self.decom_net.parameters():
+                    # Unfreeze DecompositionNet parameters
+                    for param in self.decomposition_net.parameters():
                         param.requires_grad = True
                     # Recreate optimizer to include all parameters
                     self.optimizer = torch.optim.Adam(self.parameters(), lr=self.optimizer.param_groups[0]['lr'])
                     if self.adaptive_lr:
                         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=self.lr_update_period, gamma=self.lr_update_factor)
-                    print(f"Epoch {epoch+1}: DecomNet unfrozen")
+                    print(f"Epoch {epoch+1}: DecompositionNet unfrozen")
             
             cur_epoch_losses = {
                 'total_loss': 0,
@@ -305,7 +299,6 @@ class LowLightEnhance(nn.Module):
             count = 0
             for batch_id in range(num_batches):
                 batch_input_low = np.zeros((batch_size, patch_size, patch_size, self.input_channels), dtype=np.float32)
-                batch_input_high = np.zeros((batch_size, patch_size, patch_size, self.input_channels), dtype=np.float32)
                 
                 for i in range(batch_size):
                     idx = (batch_id * batch_size + i) % len(train_low_data)
@@ -314,14 +307,11 @@ class LowLightEnhance(nn.Module):
                     y = np.random.randint(0, w - patch_size)
                     rand_mode = np.random.randint(0, 8)
                     low_patch = data_augmentation(train_low_data[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
-                    high_patch = data_augmentation(train_high_data[idx][x:x+patch_size, y:y+patch_size, :], rand_mode)
                     batch_input_low[i] = low_patch
-                    batch_input_high[i] = high_patch
                 
                 batch_input_low = torch.from_numpy(batch_input_low).permute(0, 3, 1, 2).to(self.device)
-                batch_input_high = torch.from_numpy(batch_input_high).permute(0, 3, 1, 2).to(self.device)
                 self.optimizer.zero_grad()
-                loss, batch_losses = self.compute_loss(batch_input_low, batch_input_high)
+                loss, batch_losses = self.compute_loss(batch_input_low)
                 loss.backward()
                 self.optimizer.step()
                 self.accumulate_loss_dict(cur_epoch_losses, batch_losses)
@@ -333,7 +323,7 @@ class LowLightEnhance(nn.Module):
             
             avg_epoch_loss = cur_epoch_losses['total_loss'] / count if count > 0 else 0
             if (epoch + 1) % plot_every_epoch == 0:
-                self.plot_loss_curve(os.path.join(eval_result_dir, 'loss_curves_combined.png'))
+                self.plot_loss_curve(os.path.join(eval_result_dir, 'loss_curves.png'))
             
             if (epoch + 1) % eval_every_epoch == 0:
                 self.evaluate_model(eval_low_data, eval_files, eval_result_dir, epoch+1, label_dir)
@@ -354,10 +344,15 @@ class LowLightEnhance(nn.Module):
         """
         Evaluates the model on the evaluation dataset and saves the output images.
         """
+
+        if len(eval_low_data) <= 0:
+            print(f"--- No files found for evaluation. Skipping evaluation for epoch {epoch} ---")
+            return
+
         print(f"--- Running evaluation for epoch {epoch} ---")
         self.eval()  # Set the model to evaluation mode
 
-        # Create a subdirectory for this epoch's evaluation results to keep them organized
+        # Create a subdirectory for this epoch's evaluation results
         epoch_eval_dir = os.path.join(eval_result_dir, f'epoch_{epoch}')
         os.makedirs(epoch_eval_dir, exist_ok=True)
 
@@ -391,8 +386,6 @@ class LowLightEnhance(nn.Module):
                 if self.save_i_delta:
                     I_delta_np = I_delta.squeeze(0).permute(1, 2, 0).cpu().numpy()
                     save_hsi(os.path.join(artifact_dir, filename.split('.')[0] + '_I_delta.mat'), I_delta_np)
-        
-        im_dir = epoch_eval_dir + '/*.mat'
 
         avg_psnr, avg_ssim, avg_sam = metrics.calc_metrics(
             im_dir=os.path.normpath(epoch_eval_dir + '/*.mat'),
@@ -408,7 +401,7 @@ class LowLightEnhance(nn.Module):
         self.plot_eval_metrics(os.path.join(eval_result_dir, 'eval_metrics.png'))
 
         print(f"--- Evaluation for epoch {epoch} finished. Results saved to {epoch_eval_dir} ---")
-        self.train() # IMPORTANT: Set the model back to training mode
+        self.train() # Set the model back to training mode
 
     def test_model(self, model_dir, test_low_data, test_low_data_names, save_dir, save_reflectance=False, save_illumination=False, save_i_delta=False):
         self.load_checkpoint(os.path.join(model_dir, 'model_epoch_latest.pth'))
@@ -498,18 +491,6 @@ class LowLightEnhance(nn.Module):
     def structure_aware_loss(self, R, I, R_enh, alpha=1.0, beta=1.0, lambda_I=1.0, lambda_R=1.0):
         """
         Structure-aware loss that combines edge-aware illumination smoothness and reflectance fidelity.
-        
-        Parameters:
-            R (torch.Tensor): Predicted reflectance, shape (B, C, H, W).
-            I (torch.Tensor): Predicted illumination, shape (B, 1, H, W).
-            R_enh (torch.Tensor): Reflectance of the enhanced image, shape (B, C, H, W).
-            alpha (float): Weighting parameter for edge-aware weighting.
-            beta (float): Weight for the gradient term in the reflectance loss.
-            lambda_I (float): Weight for the illumination loss.
-            lambda_R (float): Weight for the reflectance fidelity loss.
-        
-        Returns:
-            torch.Tensor: The total loss.
         """
         
         # --------------------------
@@ -560,14 +541,14 @@ class LowLightEnhance(nn.Module):
 
         return i_loss, r_loss
 
-    def compute_loss(self, input_low, input_high):
+    def compute_loss(self, input_low):
         R_low, I_low, I_delta, S = self.forward(input_low)
-        R_enh, I_enh = self.decom_net(S)
+        R_enh, I_enh = self.decomposition_net(S)
 
         alpha1 = self.alpha_i_smooth_low
         alpha2 = self.alpha_i_smooth_delta
         
-        L_reconstruction = torch.mean(torch.abs(R_low * I_low - input_high))
+        L_reconstruction = torch.mean(torch.abs(R_low * I_low - input_low))
         L_I_smooth_low, L_R_fidelity = self.structure_aware_loss(R_low, I_low, R_enh, alpha=alpha1, beta=0.5, lambda_I=1.0, lambda_R=1.0)
         L_I_smooth_delta = self.smooth_loss(I_delta, R_low, alpha=alpha2)
         L_fourier = self.fourier_spectrum_loss(input_low, S, cutoff=0.1, loss_type="l1")
@@ -659,7 +640,6 @@ class LowLightEnhance(nn.Module):
 
         plt.tight_layout()
         
-        # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         
         plt.savefig(save_path)
@@ -667,8 +647,6 @@ class LowLightEnhance(nn.Module):
         print(f"Eval metrics saved to {save_path}")
 
     def plot_loss_curve(self, save_path):
-        """Plot and save all training loss curves with epoch numbers"""
-        
         epochs = range(1, len(self.all_epoch_losses['total_loss']) + 1)
         
         plt.figure(figsize=(20, 10))
@@ -732,7 +710,6 @@ class LowLightEnhance(nn.Module):
 
         plt.tight_layout()
         
-        # Create directory if it doesn't exist
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         
         plt.savefig(save_path)

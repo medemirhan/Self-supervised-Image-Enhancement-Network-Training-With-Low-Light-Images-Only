@@ -1,7 +1,5 @@
 import numpy as np
 import scipy.io as sio
-from pylab import histogram, interp
-from sklearn.decomposition import PCA, NMF
 
 class Struct:
     pass
@@ -35,7 +33,7 @@ def data_augmentation(image, mode):
         image = np.rot90(image, k=3)
         return np.flipud(image)
 
-def load_hsi(file, matContentHeader='ref', normalization=None, max_val=None, min_val=None):
+def load_hsi(file, matContentHeader='data', normalization=None, max_val=None, min_val=None):
     mat = sio.loadmat(file)
     mat = mat[matContentHeader]
     mat = mat.astype('float32')
@@ -57,7 +55,6 @@ def load_hsi(file, matContentHeader='ref', normalization=None, max_val=None, min
         raise NotImplementedError(normalization + ' is not implemented')
 
     return (x.astype("float32") / np.max(x))
-    #return x
 
 def per_channel_normalization(x):
     """
@@ -171,7 +168,7 @@ def inverse_per_channel_standardization(predictions, mean_vals, std_vals):
 
     return original_predictions
 
-def save_hsi(filepath, data, postfix=None, key='ref'):
+def save_hsi(filepath, data, postfix=None, key='data'):
     """Save hyperspectral image as .mat file"""
 
     savepath = filepath[:-4]
@@ -179,19 +176,6 @@ def save_hsi(filepath, data, postfix=None, key='ref'):
         savepath += postfix
     
     sio.savemat(savepath + '.mat', {key: data})
-
-def histeq(im, nbr_bins=256):
-    """Perform histogram equalization on each channel independently"""
-    output = np.zeros_like(im)
-    
-    for i in range(im.shape[-1]):
-        imhist, bins = histogram(im[:,:,i].flatten(), nbr_bins, normed=True)
-        cdf = imhist.cumsum()
-        cdf = 1.0 * cdf / cdf[-1]
-        im2 = interp(im[:,:,i].flatten(), bins[:-1], cdf)
-        output[:,:,i] = im2.reshape(im[:,:,i].shape)
-    
-    return output
 
 def adaptive_lr(num_epochs, divide_period, divide_by, initial_value):
     # Create an array to store the result
@@ -220,61 +204,6 @@ def polynomial_decay(initial_value, decay_rate, power, step):
         float: The decayed value.
     """
     return initial_value / (1 + decay_rate * step) ** power
-
-def pca_projection(hyper_img, seed=42):
-    """
-    Applies PCA on a hyperspectral image and returns the first principal component as a single-channel image.
-    
-    Parameters:
-        hyper_img (np.ndarray): Input hyperspectral image of shape (h, w, c).
-    
-    Returns:
-        pc1_img (np.ndarray): Output single-channel image of shape (h, w) using the first principal component.
-    """
-    # Get the dimensions
-    h, w, c = hyper_img.shape
-    
-    # Reshape the image to a 2D array: each row is a pixel with c spectral features
-    reshaped_img = hyper_img.reshape(-1, c)
-    
-    # Initialize PCA to reduce to 1 component
-    pca = PCA(n_components=1, random_state=seed)
-    
-    # Fit PCA and transform the data to obtain the first principal component
-    pc1 = pca.fit_transform(reshaped_img)  # Shape: (h*w, 1)
-    
-    # Reshape the result back to the original image spatial dimensions
-    pc1_img = pc1.reshape(h, w, 1)
-    
-    return pc1_img
-
-def nmf_projection(hyper_img, n_components=1, init='nndsvda', random_state=0):
-    """
-    Applies Nonnegative Matrix Factorization (NMF) on a hyperspectral image and returns a 
-    single-channel image using the NMF component. The output values are nonnegative.
-    
-    Parameters:
-        hyper_img (np.ndarray): Input hyperspectral image of shape (h, w, c). 
-                                Ensure the data is nonnegative (e.g., normalized or using absolute values).
-        n_components (int): Number of components for NMF. Default is 1.
-        init (str): Initialization method. 'nndsvda' works well in many cases.
-        random_state (int): Random state for reproducibility.
-    
-    Returns:
-        nmf_img (np.ndarray): Output single-channel image of shape (h, w) from NMF.
-    """
-    h, w, c = hyper_img.shape
-    # Reshape the image: each row corresponds to a pixel's spectral signature.
-    reshaped_img = hyper_img.reshape(-1, c)
-    
-    # Create and fit the NMF model.
-    nmf_model = NMF(n_components=n_components, init=init, random_state=random_state, max_iter=500)
-    W = nmf_model.fit_transform(reshaped_img)
-    
-    # For n_components=1, W is (h*w, 1). Reshape it back to the spatial dimensions.
-    nmf_img = W.reshape(h, w, 1)
-    
-    return nmf_img
 
 def select_hsi_wavelengths(range_start, range_end, total_channels, d_head, d_tail, s=3):
     """

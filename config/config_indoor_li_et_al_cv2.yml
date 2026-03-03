@@ -13,10 +13,10 @@ patch_size: 128
 start_lr: 0.001
 lr_update_factor: 1
 lr_update_period: 400
-train_data: "../PairLIE/data/hsi_dataset_indoor_only/crossVal/train1"
-eval_data: "../PairLIE/data/hsi_dataset_indoor_only/eval"
-test_data: "../PairLIE/data/hsi_dataset_indoor_only/crossVal/test1"
-label_dir: "../PairLIE/data/label_ll"
+train_data: "./data/indoor/cross_validation/train_fold_2/low"
+eval_data: "./data/indoor/cross_validation/eval_fold_2/low"
+test_data: "./data/indoor/cross_validation/test_fold_2/low"
+label_dir: "./data/indoor/cross_validation/test_fold_2/high"
 phase: "train_and_test"
 epoch: 400
 eval_every_epoch: 200

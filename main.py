@@ -8,7 +8,7 @@ from datetime import datetime
 import torch
 import mlflow
 from model import LowLightEnhance
-from utils import load_hsi, Struct
+from utils import load_hsi
 from metrics import calc_metrics
 from logger import Logger
 import sys
@@ -30,10 +30,10 @@ def parse_args():
         'start_lr': 0.001,
         'lr_update_factor': 1,
         'lr_update_period': 400,
-        'train_data': '../PairLIE/data/hsi_dataset_indoor_only/train',
-        'eval_data': '../PairLIE/data/hsi_dataset_indoor_only/eval',
-        'test_data': '../PairLIE/data/hsi_dataset_indoor_only/test',
-        'label_dir': '../PairLIE/data/label_ll',
+        'train_data': './data/train/low',
+        'eval_data': './data/eval/low',
+        'test_data': './data/test/low',
+        'label_dir': './data/test/high',
         'phase': 'train_and_test',
         'epoch': 400,
         'eval_every_epoch': 200,
@@ -82,9 +82,9 @@ def parse_args():
     # Don't change
     args.full_model_name = args.model_name + '_' + args.timestamp + postfix
     args.model_ckpt_dir = './checkpoint/' + args.model_name
-    args.eval_result_dir = 'D:/sslie/eval_results_' + args.full_model_name
-    args.test_result_dir = 'D:/sslie/test_results_' + args.full_model_name
-    args.test_model_dir = './checkpoint/' + args.model_name + '/Decom_' + args.timestamp
+    args.eval_result_dir = './results/eval_results_' + args.full_model_name
+    args.test_result_dir = './results/test_results_' + args.full_model_name
+    args.test_model_dir = './checkpoint/' + args.model_name + '/decomposition_' + args.timestamp
     args.log_file_path = './logs/' + args.full_model_name + '.log'
     
     return args
@@ -108,7 +108,7 @@ def test(model, args):
     if not os.path.exists(args.test_result_dir):
         os.makedirs(args.test_result_dir)
 
-    test_low_data_name = sorted(glob(os.path.join(args.test_data) + '/*.*'))  # Sorted for reproducibility
+    test_low_data_name = sorted(glob(os.path.join(args.test_data) + '/*.*'))
 
     test_low_data = []
     
@@ -136,7 +136,7 @@ def eval_metrics(args):
         label_dir=os.path.normpath(args.label_dir),
         data_min=data_min,
         data_max=args.global_max,
-        matKeyPrediction='ref',
+        matKeyPrediction='data',
         matKeyGt='data'
         )
 
@@ -157,7 +157,6 @@ def main(args):
             print(f"{arg} : {value}")
         print("------------------------")
 
-        # Set random seeds for reproducibility
         random.seed(args.seed_value)
         np.random.seed(args.seed_value)
         torch.manual_seed(args.seed_value)
@@ -169,7 +168,6 @@ def main(args):
         device = torch.device("cuda" if args.use_gpu and torch.cuda.is_available() else "cpu")
         print("Using device:", device)
         
-        # Create model
         model = LowLightEnhance(
             input_channels=args.channels,
             lr=args.start_lr,
@@ -208,9 +206,9 @@ def main(args):
             
             print("Pretrained model loaded successfully!")
             
-            # Optionally freeze DecomNet for initial epochs
+            # Optionally freeze decomposition network for initial epochs
             if hasattr(args, 'freeze_decom_epochs') and args.freeze_decom_epochs > 0:
-                print(f"DecomNet will be frozen for the first {args.freeze_decom_epochs} epochs")
+                print(f"decomposition network will be frozen for the first {args.freeze_decom_epochs} epochs")
                 model.freeze_decom_epochs = args.freeze_decom_epochs
         
         # If channels is not given, try to infer from the first training image.
@@ -262,8 +260,6 @@ def main(args):
                 train(model, args)
                 test(model, args)
                 eval_metrics(args)
-            else:
-                print('[!] Unknown phase')
             
             mlflow.log_artifact(log_filepath, artifact_path="run_logs")
     

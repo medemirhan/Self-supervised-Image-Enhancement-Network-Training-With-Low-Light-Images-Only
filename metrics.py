@@ -33,18 +33,6 @@ def sam(input, target, reduction='elementwise_mean'):
     im2 = target.permute(2, 0, 1).unsqueeze(0)
     return spectral_angle_mapper(im1, im2, reduction=reduction)
 
-def psnr_sk(input, target, data_range=None):
-    if data_range == None:
-        return psnr_skimage(input, target)
-    else:
-        return psnr_skimage(input, target, data_range=data_range[1] - data_range[0])
-
-def ssim_sk(input, target, data_range=None):
-    if data_range == None:
-        return ssim_skimage(input, target)
-    else:
-        return ssim_skimage(input, target, data_range=data_range[1] - data_range[0])
-
 def single_img_bandwise_metrics(pred_path, label_path, data_min=None, data_max=None, matKeyPrediction='data', matKeyGt='data'):
     im1 = load_hsi(pred_path, matContentHeader=matKeyPrediction)
     im2 = load_hsi(label_path, matContentHeader=matKeyGt)
@@ -63,8 +51,8 @@ def single_img_bandwise_metrics(pred_path, label_path, data_min=None, data_max=N
     psnr_vec = []
     ssim_vec = []
     for i in range(c):
-        score_psnr = psnr(im1[:,:,i], im2[:,:,i], data_range=data_range) # data range onemli. incele!
-        score_ssim = ssim_bandwise(im1[:,:,i], im2[:,:,i], data_range=data_range) # data range onemli. incele!
+        score_psnr = psnr(im1[:,:,i], im2[:,:,i], data_range=data_range)
+        score_ssim = ssim_bandwise(im1[:,:,i], im2[:,:,i], data_range=data_range)
 
         psnr_vec.append(score_psnr)
         ssim_vec.append(score_ssim)
@@ -102,6 +90,9 @@ def multi_img_bandwise_metrics(preds_path, labels_path, data_min=None, data_max=
 
         count += 1
     
+    if count <= 0:
+        raise ValueError("Number of files must be greater than 0")
+
     psnr_avg_vec = np.array(psnr_sum / count)
     ssim_avg_vec = np.array(ssim_sum / count)
 
@@ -121,10 +112,6 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
             im2 = load_hsi(os.path.join(label_dir, name), matContentHeader=matKeyGt)
             im2 = torch.from_numpy(im2).to(dtype=torch.float32)
 
-            # im1 = np.clip(im1, 0.0708354, 1.7410845)
-
-            # im1 = im1 * (694.599672 - 0.004533) + 0.004533
-
             data_range = None
             if data_min != None and data_max != None:
                 data_range = (data_min, data_max)
@@ -132,9 +119,9 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
             elif data_max != None:
                 data_range = data_max
 
-            score_psnr = psnr(im1, im2, data_range=data_range) # data range onemli. incele!
-            score_ssim = ssim(im1, im2, data_range=data_range) # data range onemli. incele!
-            score_sam = sam(im1, im2, reduction='elementwise_mean') # reduction onemli. incele!
+            score_psnr = psnr(im1, im2, data_range=data_range)
+            score_ssim = ssim(im1, im2, data_range=data_range)
+            score_sam = sam(im1, im2, reduction='elementwise_mean')
         
             print(f'\n===> {name} | PSNR : {score_psnr:.4f}')
             print(f'===> {name} | SSIM : {score_ssim:.4f}')
@@ -144,6 +131,9 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
             avg_ssim += score_ssim
             avg_sam += score_sam
 
+    if n <= 0:
+        raise ValueError("Number of files must be greater than 0")
+
     avg_psnr = avg_psnr / n
     avg_ssim = avg_ssim / n
     avg_sam = avg_sam / n
@@ -152,19 +142,18 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
 
 if __name__ == '__main__':
 
-    globalMin = 238.
+    '''globalMin = 238.
     globalMax = 4095.
 
-    im_dir = 'D:/results/comparison/enlightengan/jyu_indoor_v2/*.mat'
-    label_dir = 'D:/results/comparison/normal/jyu_indoor_v2'
-    
-    
-    '''globalMin = 0.0708354
+    im_dir = './data/jyu_outdoor/selected_outdoor_64_registration_nonSaturated_splitted_v3/lowAligned/test/*.mat'
+    label_dir = './data/jyu_outdoor/selected_outdoor_64_registration_nonSaturated_splitted_v3/high/test'
+    '''
+
+    globalMin = 0.0708354
     globalMax = 1.6697606
 
-    im_dir = 'D:/sslie/test_results_indoor_1000_epoch_20251214_234340/*.mat'
-    label_dir = '../PairLIE/data/label_ll'
-    '''
+    im_dir = './data/indoor/cross_validation/test_fold_1/low/*.mat'
+    label_dir = './data/indoor/cross_validation/test_fold_1/high'
 
     avg_psnr, avg_ssim, avg_sam = calc_metrics(
         im_dir=os.path.normpath(im_dir),
@@ -178,24 +167,3 @@ if __name__ == '__main__':
     print(f'\n===> Avg.PSNR : {avg_psnr:.4f}')
     print(f'===> Avg.SSIM : {avg_ssim:.4f}')
     print(f'===> Avg.SAM  : {avg_sam:.4f}')
-    
-    '''psnr_vec, ssim_vec = single_img_bandwise_metrics(
-        pred_path='C:/Users/medemirhan/Desktop/comparison/results/msr/5/buildingblock.mat',
-        label_path='C:/Users/medemirhan/Desktop/n2n/PairLIE/data/label_ll/buildingblock.mat',
-        data_min=None,
-        data_max=globalMax,
-        matKeyPrediction='data',
-        matKeyGt='data'
-        )
-    
-    sio.savemat('./psnr_vec6.mat', {"data": np.array(psnr_vec)})
-    sio.savemat('./ssim_vec6.mat', {"data": np.array(ssim_vec)})'''
-
-    '''multi_img_bandwise_metrics(
-        preds_path='C:/Users/medemirhan/Desktop/comparison/results/msr/5',
-        labels_path='C:/Users/medemirhan/Desktop/n2n/PairLIE/data/label_ll',
-        data_min=None,
-        data_max=globalMax,
-        matKeyPrediction='data',
-        matKeyGt='data'
-        )'''

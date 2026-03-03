@@ -13,10 +13,10 @@ patch_size: 128
 start_lr: 0.001
 lr_update_factor: 0.1
 lr_update_period: 250
-train_data: "D:/jyu/selected_outdoor_64_registration_nonSaturated_splitted_v3/lowAligned/train"
-eval_data: "D:/jyu/selected_outdoor_64_registration_nonSaturated_splitted_v3/lowAligned/test"
-test_data: "D:/jyu/selected_outdoor_64_registration_nonSaturated_splitted_v3/lowAligned/test"
-label_dir: "D:/jyu/selected_outdoor_64_registration_nonSaturated_splitted_v3/high/test"
+train_data: "./data/low/train"
+eval_data: "./data/low/eval"
+test_data: "./data/low/test"
+label_dir: "./data/high/test"
 phase: "train_and_test"
 epoch: 400
 eval_every_epoch: 100
