@@ -142,18 +142,11 @@ def calc_metrics(im_dir, label_dir, data_min=None, data_max=None, matKeyPredicti
 
 if __name__ == '__main__':
 
-    '''globalMin = 238.
+    globalMin = 238.
     globalMax = 4095.
-
-    im_dir = './data/jyu_outdoor/selected_outdoor_64_registration_nonSaturated_splitted_v3/lowAligned/test/*.mat'
-    label_dir = './data/jyu_outdoor/selected_outdoor_64_registration_nonSaturated_splitted_v3/high/test'
-    '''
-
-    globalMin = 0.0708354
-    globalMax = 1.6697606
-
-    im_dir = './data/indoor/cross_validation/test_fold_1/low/*.mat'
-    label_dir = './data/indoor/cross_validation/test_fold_1/high'
+    
+    im_dir = './results/test/*.mat'
+    label_dir = './data/high/test'
 
     avg_psnr, avg_ssim, avg_sam = calc_metrics(
         im_dir=os.path.normpath(im_dir),

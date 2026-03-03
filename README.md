@@ -1,5 +1,5 @@
 ## Self-Supervised Low-Light Hyperspectral Image Enhancement via Fourier-Based Transformer Network
-* PyTorch implementation of [SS-HSLIE](https://ieeexplore.ieee.org/document/11248865).
+* PyTorch implementation of [SS-HSLIE](https://ieeexplore.ieee.org/document/11248865)
 * Tested on pytorch==2.5.1
 
 ### Installation
